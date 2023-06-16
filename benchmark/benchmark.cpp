@@ -1,8 +1,5 @@
 // Copyright 2019 JD.com Inc. JD AI
 
-#include <chrono>
-#include <memory>
-
 #include <benchmark/benchmark.h>
 #include <common/baseline.h>
 #include <common/helper.h>
@@ -12,6 +9,10 @@
 #include <dabnn/layers/MaxPool.h>
 #include <dabnn/mat.h>
 #include <dabnn/net.h>
+
+#include <chrono>
+#include <dabnn/layers/Add.cpp>
+#include <memory>
 
 static void BM_pack_mat_64_small(benchmark::State &state) {
     const bnn::Mat a(1, 32, 32, 128, bnn::DataType::Float, false);
@@ -363,6 +364,32 @@ static void BM_bireal18_imagenet_wo_fconv(benchmark::State &state) {
     }
 }
 
+#define SETUP_BADD(n, w, h, c)                          \
+    const size_t LENGTH = n * w * h * c;                \
+                                                        \
+    uint64_t a_data[LENGTH];                            \
+    uint64_t b_data[LENGTH];                            \
+    FORZ(i, LENGTH) { a_data[i] = 3 * i; }              \
+    FORZ(i, LENGTH) { b_data[i] = 1 * i; }              \
+                                                        \
+    bnn::Mat a(n, w, h, c, a_data, bnn::DataType::Bit); \
+    bnn::Mat b(n, w, h, c, b_data, bnn::DataType::Bit);
+
+static void BM_badd_main(benchmark::State &state) {
+    SETUP_BADD(64, 4, 4, 128);
+    for (auto _ : state) {
+        std::cout << "a.n: " << a.n << std::endl;
+        std::cout << "a.h: " << a.h << std::endl;
+        std::cout << "a.w: " << a.w << std::endl;
+        std::cout << "a.c: " << a.c << std::endl;
+        // a.display();
+        // b.display();
+        bnn::add_inplace(a, b);
+        a.display();
+    }
+}
+#undef SETUP_BADD
+
 BENCHMARK_MAIN();
 
 // BENCHMARK(BM_pack_mat_64);
@@ -374,19 +401,20 @@ BENCHMARK_MAIN();
 // BENCHMARK(BM_bgemm_128);
 // BENCHMARK(BM_bgemm_256);
 // BENCHMARK(BM_bgemm_256_s2);
-BENCHMARK(BM_bgemm_5x5_256);
+// BENCHMARK(BM_bgemm_5x5_256); -- Use this one
 // BENCHMARK(BM_bgemm_512);
-BENCHMARK(BM_bnn_bconv_3x3_64);
-BENCHMARK(BM_bnn_bconv_3x3_128);
-BENCHMARK(BM_bnn_bconv_3x3_256);
-BENCHMARK(BM_bnn_bconv_3x3_256_s2);
-BENCHMARK(BM_bnn_bconv_3x3_512);
+// BENCHMARK(BM_bnn_bconv_3x3_64); -- Use this one
+// BENCHMARK(BM_bnn_bconv_3x3_128); -- Use this one
+// BENCHMARK(BM_bnn_bconv_3x3_256); -- Use this one
+// BENCHMARK(BM_bnn_bconv_3x3_256_s2); -- Use this one
+// BENCHMARK(BM_bnn_bconv_3x3_512); -- Use this one
 // BENCHMARK(BM_bnn_bconv_3x3_1024);
 // BENCHMARK(BM_bireal18_cifar_wo_fconv);
 // BENCHMARK(BM_bireal18_imagenet_wo_fconv);
 // BENCHMARK(BM_bireal18_cifar);
-BENCHMARK(BM_bireal18_imagenet);
-BENCHMARK(BM_bireal18_imagenet_stem);
+// BENCHMARK(BM_bireal18_imagenet);
+// BENCHMARK(BM_bireal18_imagenet_stem);
 // BENCHMARK(BM_bnn_bconv_3x3_naive_128);
 // BENCHMARK(BM_bconv_float_1x1_128);
 // BENCHMARK(BM_bconv_float_3x3_128);
+BENCHMARK(BM_badd_main)->Iterations(1);
