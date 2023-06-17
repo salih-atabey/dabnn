@@ -670,7 +670,7 @@ inline void Mat::display() {
                 auto *ptr = point<uint64_t>(n_i, h_i, 0);
                 FORZ(w_i, w) {
                     std::cout << "(";
-                    FORZ(c_i, c) { std::cout << *ptr++ << ", "; }
+                    FORZ(c_i, c) { std::cout << std::hex << *ptr++ << ", "; }
                     std::cout << ") ";
                 }
             } else {

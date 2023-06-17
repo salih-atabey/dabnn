@@ -410,16 +410,15 @@ static void BM_badd_1024(benchmark::State &state) {
 }
 #undef SETUP_BADD
 
-
 #define SETUP_BAFFINE(n, w, h, c)                       \
     const size_t LENGTH = n * w * h * c;                \
                                                         \
     uint64_t a_data[LENGTH];                            \
     uint64_t x_data[LENGTH];                            \
     uint64_t b_data[LENGTH];                            \
-    FORZ(i, LENGTH) { a_data[i] = 13; }              \
-    FORZ(i, LENGTH) { x_data[i] = 7; }              \
-    FORZ(i, LENGTH) { b_data[i] = 5; }              \
+    FORZ(i, LENGTH) { a_data[i] = 13; }                 \
+    FORZ(i, LENGTH) { x_data[i] = 7; }                  \
+    FORZ(i, LENGTH) { b_data[i] = 5; }                  \
                                                         \
     bnn::Mat a(n, w, h, c, a_data, bnn::DataType::Bit); \
     bnn::Mat x(n, w, h, c, x_data, bnn::DataType::Bit); \
@@ -457,20 +456,18 @@ static void BM_baffine_1024(benchmark::State &state) {
 }
 #undef SETUP_BAFFINE
 
-
-#define SETUP_BAVEPOOL(n, w, h, c, p)                       \
-    const size_t PWIDTH = p;                \
-    const size_t PHEIGHT = p;                \
-    const size_t LENGTH = n * w * h * c;                \
-                                                        \
-    float a_data[LENGTH];                            \
-    float b_data[LENGTH];                            \
-    FORZ(i, LENGTH) { a_data[i] = i*i; }              \
-    FORZ(i, LENGTH) { b_data[i] = 0; }              \
-                                                        \
+#define SETUP_BAVEPOOL(n, w, h, c, p)                     \
+    const size_t PWIDTH = p;                              \
+    const size_t PHEIGHT = p;                             \
+    const size_t LENGTH = n * w * h * c;                  \
+                                                          \
+    float a_data[LENGTH];                                 \
+    float b_data[LENGTH];                                 \
+    FORZ(i, LENGTH) { a_data[i] = i * i; }                \
+    FORZ(i, LENGTH) { b_data[i] = 0; }                    \
+                                                          \
     bnn::Mat a(n, w, h, c, a_data, bnn::DataType::Float); \
     bnn::Mat b(n, w, h, c, b_data, bnn::DataType::Float);
-
 
 static void BM_bavepool_debug(benchmark::State &state) {
     SETUP_BAVEPOOL(1, 8, 8, 1, 3);
@@ -499,6 +496,45 @@ static void BM_bavepool_512(benchmark::State &state) {
     }
 }
 #undef SETUP_BAVEPOOL
+
+#define SETUP_BINARIZE(n, w, h, c)                           \
+    const size_t LENGTH = n * w * h * c;               \
+                                                             \
+    float a_data[LENGTH];                                   \
+    uint64_t b_data[LENGTH];                                \
+    FORZ(i, LENGTH) { a_data[i] = 1; }                  \
+    FORZ(i, LENGTH) { b_data[i] = 0; }                      \
+                                                             \
+    bnn::Mat a(n, w, h, c, a_data, bnn::DataType::Float); \
+    bnn::Mat b(n, w, h, c, b_data, bnn::DataType::Bit);
+
+static void BM_binarize_debug(benchmark::State &state) {
+    SETUP_BINARIZE(1, 4, 4, 64);
+    for (auto _ : state) {
+        std::cout << "--- Debug Binarize ---" << std::endl;
+        std::cout << "Vector A:" << std::endl;
+        a.display();
+        std::cout << "Binarize vector A..." << std::endl;
+        bnn::pack_mat(a, b);
+        std::cout << "Vector B:" << std::endl;
+        b.display();
+    }
+}
+
+static void BM_binarize_256(benchmark::State &state) {
+    SETUP_BINARIZE(1, 1, 256, 64);
+    for (auto _ : state) {
+        bnn::pack_mat(a, b);
+    }
+}
+
+static void BM_binarize_1024(benchmark::State &state) {
+    SETUP_BINARIZE(1, 1, 1024, 64);
+    for (auto _ : state) {
+        bnn::pack_mat(a, b);
+    }
+}
+#undef SETUP_BINARIZE
 
 BENCHMARK_MAIN();
 
@@ -529,21 +565,26 @@ BENCHMARK_MAIN();
 // BENCHMARK(BM_bconv_float_1x1_128);
 // BENCHMARK(BM_bconv_float_3x3_128);
 
-/* BIREAL */
+// BIREAL
 BENCHMARK(BM_bireal18_imagenet);
 BENCHMARK(BM_bireal18_imagenet_stem);
 
-/* ADD */
+// ADD
 BENCHMARK(BM_badd_256);
 BENCHMARK(BM_badd_1024);
 // BENCHMARK(BM_badd_debug)->Iterations(1);
 
-/* AFFINE */
+// AFFINE
 BENCHMARK(BM_baffine_256);
 BENCHMARK(BM_baffine_1024);
 // BENCHMARK(BM_baffine_debug)->Iterations(1);
 
-/* AVEPOLL */
+// AVEPOLL
 BENCHMARK(BM_bavepool_256);
 BENCHMARK(BM_bavepool_512);
 // BENCHMARK(BM_bavepool_debug)->Iterations(1);
+
+// BINARIZE
+BENCHMARK(BM_binarize_256);
+BENCHMARK(BM_binarize_1024);
+// BENCHMARK(BM_binarize_debug)->Iterations(1);
