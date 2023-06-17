@@ -12,6 +12,7 @@
 #include <dabnn/net.h>
 #include <dabnn/layers/Add.cpp>
 #include <dabnn/layers/Affine.cpp>
+#include <dabnn/layers/AvePool.cpp>
 #include <dabnn/layers/MaxPool.h>
 
 static void BM_pack_mat_64_small(benchmark::State &state) {
@@ -456,6 +457,49 @@ static void BM_baffine_1024(benchmark::State &state) {
 }
 #undef SETUP_BAFFINE
 
+
+#define SETUP_BAVEPOOL(n, w, h, c, p)                       \
+    const size_t PWIDTH = p;                \
+    const size_t PHEIGHT = p;                \
+    const size_t LENGTH = n * w * h * c;                \
+                                                        \
+    float a_data[LENGTH];                            \
+    float b_data[LENGTH];                            \
+    FORZ(i, LENGTH) { a_data[i] = i*i; }              \
+    FORZ(i, LENGTH) { b_data[i] = 0; }              \
+                                                        \
+    bnn::Mat a(n, w, h, c, a_data, bnn::DataType::Float); \
+    bnn::Mat b(n, w, h, c, b_data, bnn::DataType::Float);
+
+
+static void BM_bavepool_debug(benchmark::State &state) {
+    SETUP_BAVEPOOL(1, 8, 8, 1, 3);
+    for (auto _ : state) {
+        std::cout << "--- Debug AvePool ---" << std::endl;
+        std::cout << "Vector A:" << std::endl;
+        a.display();
+        std::cout << "Affine vectors A and B..." << std::endl;
+        bnn::ave_pool_fallback(a, 1, 1, 1, 1, PWIDTH, PHEIGHT, b);
+        std::cout << "Vector B:" << std::endl;
+        b.display();
+    }
+}
+
+static void BM_bavepool_256(benchmark::State &state) {
+    SETUP_BAVEPOOL(1, 256, 256, 1, 3);
+    for (auto _ : state) {
+        bnn::ave_pool_fallback(a, 1, 1, 1, 1, PWIDTH, PHEIGHT, b);
+    }
+}
+
+static void BM_bavepool_512(benchmark::State &state) {
+    SETUP_BAVEPOOL(1, 512, 512, 1, 3);
+    for (auto _ : state) {
+        bnn::ave_pool_fallback(a, 1, 1, 1, 1, PWIDTH, PHEIGHT, b);
+    }
+}
+#undef SETUP_BAVEPOOL
+
 BENCHMARK_MAIN();
 
 /* ORIGIN */
@@ -479,11 +523,15 @@ BENCHMARK_MAIN();
 // BENCHMARK(BM_bireal18_cifar_wo_fconv);
 // BENCHMARK(BM_bireal18_imagenet_wo_fconv);
 // BENCHMARK(BM_bireal18_cifar);
-BENCHMARK(BM_bireal18_imagenet);
-BENCHMARK(BM_bireal18_imagenet_stem);
+// BENCHMARK(BM_bireal18_imagenet);
+// BENCHMARK(BM_bireal18_imagenet_stem);
 // BENCHMARK(BM_bnn_bconv_3x3_naive_128);
 // BENCHMARK(BM_bconv_float_1x1_128);
 // BENCHMARK(BM_bconv_float_3x3_128);
+
+/* BIREAL */
+BENCHMARK(BM_bireal18_imagenet);
+BENCHMARK(BM_bireal18_imagenet_stem);
 
 /* ADD */
 BENCHMARK(BM_badd_256);
@@ -494,3 +542,8 @@ BENCHMARK(BM_badd_1024);
 BENCHMARK(BM_baffine_256);
 BENCHMARK(BM_baffine_1024);
 // BENCHMARK(BM_baffine_debug)->Iterations(1);
+
+/* AVEPOLL */
+BENCHMARK(BM_bavepool_256);
+BENCHMARK(BM_bavepool_512);
+// BENCHMARK(BM_bavepool_debug)->Iterations(1);

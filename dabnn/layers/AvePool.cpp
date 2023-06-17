@@ -92,33 +92,68 @@ void ave_pool_fallback(const bnn::Mat &input, const size_t pad_h,
 
     BNN_ASSERT(input.w * input.c * input.elemsize % 16 == 0, "Not align");
     BNN_ASSERT(output.w * output.c * output.elemsize % 16 == 0, "Not align");
+    BNN_ASSERT(input.data_type == input.data_type, "Mismatch datatype");
 
     int input_y = 0;
-    FORZ(output_y, output_h) {
-        int input_x = 0;
-        FORZ(output_x, output_w) {
-            FORZ(output_c, input.c) {
-                size_t n = 0;
-                float sum = 0;
-                FORZ(kh, kernel_h) {
-                    int y = input_y - pad_h + kh;
-                    const float *input_ptr = input.point<float>(y, 0);
-                    FORZ(kw, kernel_w) {
-                        int x = input_x - pad_w + kw;
-                        if (!(y < 0 || y >= input.h || x < 0 || x >= input.w)) {
-                            const auto val = input_ptr[x * input.c + output_c];
-                            sum += val;
-                            n++;
+
+    if (input.data_type == DataType::Float) {
+        FORZ(output_y, output_h) {
+            int input_x = 0;
+            FORZ(output_x, output_w) {
+                FORZ(output_c, input.c) {
+                    size_t n = 0;
+                    float sum = 0;
+                    FORZ(kh, kernel_h) {
+                        int y = input_y - pad_h + kh;
+                        const auto *input_ptr = input.point<float>(y, 0);
+                        FORZ(kw, kernel_w) {
+                            int x = input_x - pad_w + kw;
+                            if (!(y < 0 || y >= input.h || x < 0 ||
+                                  x >= input.w)) {
+                                const auto val =
+                                    input_ptr[x * input.c + output_c];
+                                sum += val;
+                                n++;
+                            }
                         }
                     }
+                    output[output_y * output_w * input.c + output_x * input.c +
+                           output_c] = sum / n;
                 }
-
-                output[output_y * output_w * input.c + output_x * input.c +
-                       output_c] = sum / n;
+                input_x += stride_w;
             }
-            input_x += stride_w;
+            input_y += stride_h;
         }
-        input_y += stride_h;
+    } else if (input.data_type == DataType::Bit) {
+        FORZ(output_y, output_h) {
+            int input_x = 0;
+            FORZ(output_x, output_w) {
+                FORZ(output_c, input.c) {
+                    size_t n = 0;
+                    uint64_t sum = 0;
+                    FORZ(kh, kernel_h) {
+                        int y = input_y - pad_h + kh;
+                        const auto *input_ptr = input.point<uint64_t>(y, 0);
+                        FORZ(kw, kernel_w) {
+                            int x = input_x - pad_w + kw;
+                            if (!(y < 0 || y >= input.h || x < 0 ||
+                                  x >= input.w)) {
+                                const auto val =
+                                    input_ptr[x * input.c + output_c];
+                                sum += val;
+                                n++;
+                            }
+                        }
+                    }
+                    output[output_y * output_w * input.c + output_x * input.c +
+                           output_c] = sum / n;
+                }
+                input_x += stride_w;
+            }
+            input_y += stride_h;
+        }
+    } else {
+        throw std::invalid_argument("Unknown datatype");
     }
 }
 
