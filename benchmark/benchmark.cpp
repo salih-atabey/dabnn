@@ -1,18 +1,18 @@
 // Copyright 2019 JD.com Inc. JD AI
 
+#include <chrono>
+#include <memory>
 #include <benchmark/benchmark.h>
 #include <common/baseline.h>
 #include <common/helper.h>
 #include <dabnn/bconv.h>
 #include <dabnn/bgemm.h>
 #include <dabnn/bitpack.h>
-#include <dabnn/layers/MaxPool.h>
 #include <dabnn/mat.h>
 #include <dabnn/net.h>
-
-#include <chrono>
 #include <dabnn/layers/Add.cpp>
-#include <memory>
+#include <dabnn/layers/Affine.cpp>
+#include <dabnn/layers/MaxPool.h>
 
 static void BM_pack_mat_64_small(benchmark::State &state) {
     const bnn::Mat a(1, 32, 32, 128, bnn::DataType::Float, false);
@@ -324,7 +324,7 @@ static void BM_bireal18_imagenet(benchmark::State &state) {
     float input[3 * 224 * 224];
 
     auto net = bnn::Net::create();
-    net->read("/data/local/tmp/model_imagenet.dab");
+    net->read("/workspace/dabnn/models/birealnet18.dab");
     for (auto _ : state) {
         net->run(input);
     }
@@ -334,7 +334,7 @@ static void BM_bireal18_imagenet_stem(benchmark::State &state) {
     float input[3 * 224 * 224];
 
     auto net = bnn::Net::create();
-    net->read("/data/local/tmp/model_imagenet_stem.dab");
+    net->read("/workspace/dabnn/models/birealnet18stem.dab");
     for (auto _ : state) {
         net->run(input);
     }
@@ -370,28 +370,95 @@ static void BM_bireal18_imagenet_wo_fconv(benchmark::State &state) {
     uint64_t a_data[LENGTH];                            \
     uint64_t b_data[LENGTH];                            \
     FORZ(i, LENGTH) { a_data[i] = 3 * i; }              \
-    FORZ(i, LENGTH) { b_data[i] = 1 * i; }              \
+    FORZ(i, LENGTH) { b_data[i] = 2 * i; }              \
                                                         \
     bnn::Mat a(n, w, h, c, a_data, bnn::DataType::Bit); \
     bnn::Mat b(n, w, h, c, b_data, bnn::DataType::Bit);
 
-static void BM_badd_main(benchmark::State &state) {
-    SETUP_BADD(64, 4, 4, 128);
+static void BM_badd_debug(benchmark::State &state) {
+    SETUP_BADD(2, 4, 4, 256);
     for (auto _ : state) {
+        std::cout << "--- Debug Add ---" << std::endl;
         std::cout << "a.n: " << a.n << std::endl;
         std::cout << "a.h: " << a.h << std::endl;
         std::cout << "a.w: " << a.w << std::endl;
         std::cout << "a.c: " << a.c << std::endl;
-        // a.display();
-        // b.display();
-        bnn::add_inplace(a, b);
+        std::cout << "Vector A:" << std::endl;
         a.display();
+        std::cout << "Vector B:" << std::endl;
+        b.display();
+        std::cout << "Adding vectors A and B..." << std::endl;
+        bnn::add_inplace(a, b);
+        std::cout << "Vector A:" << std::endl;
+        a.display();
+    }
+}
+
+static void BM_badd_256(benchmark::State &state) {
+    SETUP_BADD(1, 1, 256, 64);
+    for (auto _ : state) {
+        bnn::add_inplace(a, b);
+    }
+}
+
+static void BM_badd_1024(benchmark::State &state) {
+    SETUP_BADD(1, 1, 1024, 64);
+    for (auto _ : state) {
+        bnn::add_inplace(a, b);
     }
 }
 #undef SETUP_BADD
 
+
+#define SETUP_BAFFINE(n, w, h, c)                       \
+    const size_t LENGTH = n * w * h * c;                \
+                                                        \
+    uint64_t a_data[LENGTH];                            \
+    uint64_t x_data[LENGTH];                            \
+    uint64_t b_data[LENGTH];                            \
+    FORZ(i, LENGTH) { a_data[i] = 13; }              \
+    FORZ(i, LENGTH) { x_data[i] = 7; }              \
+    FORZ(i, LENGTH) { b_data[i] = 5; }              \
+                                                        \
+    bnn::Mat a(n, w, h, c, a_data, bnn::DataType::Bit); \
+    bnn::Mat x(n, w, h, c, x_data, bnn::DataType::Bit); \
+    bnn::Mat b(n, w, h, c, b_data, bnn::DataType::Bit);
+
+static void BM_baffine_debug(benchmark::State &state) {
+    SETUP_BAFFINE(1, 4, 4, 64);
+    for (auto _ : state) {
+        std::cout << "--- Debug Affine ---" << std::endl;
+        std::cout << "Vector A:" << std::endl;
+        a.display();
+        std::cout << "Vector X:" << std::endl;
+        x.display();
+        std::cout << "Vector B:" << std::endl;
+        b.display();
+        std::cout << "Affine vectors A and B..." << std::endl;
+        bnn::affine_inplace(a, x, b);
+        std::cout << "Vector A:" << std::endl;
+        a.display();
+    }
+}
+
+static void BM_baffine_256(benchmark::State &state) {
+    SETUP_BAFFINE(1, 1, 256, 64);
+    for (auto _ : state) {
+        bnn::affine_inplace(a, x, b);
+    }
+}
+
+static void BM_baffine_1024(benchmark::State &state) {
+    SETUP_BAFFINE(1, 1, 1024, 64);
+    for (auto _ : state) {
+        bnn::affine_inplace(a, x, b);
+    }
+}
+#undef SETUP_BAFFINE
+
 BENCHMARK_MAIN();
 
+/* ORIGIN */
 // BENCHMARK(BM_pack_mat_64);
 // BENCHMARK(BM_pack_mat_128);
 // BENCHMARK(BM_bnn_bconv_1x1_64);
@@ -401,20 +468,29 @@ BENCHMARK_MAIN();
 // BENCHMARK(BM_bgemm_128);
 // BENCHMARK(BM_bgemm_256);
 // BENCHMARK(BM_bgemm_256_s2);
-// BENCHMARK(BM_bgemm_5x5_256); -- Use this one
+// BENCHMARK(BM_bgemm_5x5_256);
 // BENCHMARK(BM_bgemm_512);
-// BENCHMARK(BM_bnn_bconv_3x3_64); -- Use this one
-// BENCHMARK(BM_bnn_bconv_3x3_128); -- Use this one
-// BENCHMARK(BM_bnn_bconv_3x3_256); -- Use this one
-// BENCHMARK(BM_bnn_bconv_3x3_256_s2); -- Use this one
-// BENCHMARK(BM_bnn_bconv_3x3_512); -- Use this one
+// BENCHMARK(BM_bnn_bconv_3x3_64);
+// BENCHMARK(BM_bnn_bconv_3x3_128);
+// BENCHMARK(BM_bnn_bconv_3x3_256);
+// BENCHMARK(BM_bnn_bconv_3x3_256_s2);
+// BENCHMARK(BM_bnn_bconv_3x3_512);
 // BENCHMARK(BM_bnn_bconv_3x3_1024);
 // BENCHMARK(BM_bireal18_cifar_wo_fconv);
 // BENCHMARK(BM_bireal18_imagenet_wo_fconv);
 // BENCHMARK(BM_bireal18_cifar);
-// BENCHMARK(BM_bireal18_imagenet);
-// BENCHMARK(BM_bireal18_imagenet_stem);
+BENCHMARK(BM_bireal18_imagenet);
+BENCHMARK(BM_bireal18_imagenet_stem);
 // BENCHMARK(BM_bnn_bconv_3x3_naive_128);
 // BENCHMARK(BM_bconv_float_1x1_128);
 // BENCHMARK(BM_bconv_float_3x3_128);
-BENCHMARK(BM_badd_main)->Iterations(1);
+
+/* ADD */
+BENCHMARK(BM_badd_256);
+BENCHMARK(BM_badd_1024);
+// BENCHMARK(BM_badd_debug)->Iterations(1);
+
+/* AFFINE */
+BENCHMARK(BM_baffine_256);
+BENCHMARK(BM_baffine_1024);
+// BENCHMARK(BM_baffine_debug)->Iterations(1);

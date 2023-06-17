@@ -9,33 +9,75 @@ namespace bnn {
  */
 inline void affine_inplace(bnn::Mat &data, const bnn::Mat &a,
                            const bnn::Mat &b) {
-    FORZ(n, data.n) {
-        FORZ(h, data.h) {
-            auto ptr = data.point<float>(n, h, 0);
-            FORZ(w, data.w) {
-                FORZ(c, data.c) {
-                    *ptr = a[c] * *ptr + b[c];
-                    ptr++;
+    if (a.data_type != b.data_type && a.data_type != data.data_type) {
+        throw std::invalid_argument("Mismatch datatype");
+    } else if (a.data_type == DataType::Float) {
+        FORZ(n, data.n) {
+            FORZ(h, data.h) {
+                auto ptr = data.point<float>(n, h, 0);
+                auto a_ptr = a.point<float>(n, h, 0);
+                auto b_ptr = b.point<float>(n, h, 0);
+                FORZ(w, data.w) {
+                    FORZ(c, data.c) {
+                        *ptr = (*a_ptr++) * *ptr + (*b_ptr++);
+                        ptr++;
+                    }
                 }
             }
         }
+    } else if (b.data_type == DataType::Bit) {
+        FORZ(n, data.n) {
+            FORZ(h, data.h) {
+                auto ptr = data.point<uint64_t>(n, h, 0);
+                auto a_ptr = a.point<uint64_t>(n, h, 0);
+                auto b_ptr = b.point<uint64_t>(n, h, 0);
+                FORZ(w, data.w) {
+                    FORZ(c, data.c) {
+                        *ptr = (*a_ptr++) * *ptr + (*b_ptr++);
+                        ptr++;
+                    }
+                }
+            }
+        }
+    } else {
+        throw std::invalid_argument("Unknown datatype");
     }
 }
 
 inline void affine(const bnn::Mat &data, const bnn::Mat &a, const bnn::Mat &b,
                    bnn::Mat &output) {
-    FORZ(n, data.n) {
-        FORZ(h, data.h) {
-            const auto *ptr = data.point<float>(n, h, 0);
-            auto output_ptr = output.point<float>(n, h, 0);
-            FORZ(w, data.w) {
-                FORZ(c, data.c) {
-                    *output_ptr = a[c] * *ptr + b[c];
-                    ptr++;
-                    output_ptr++;
+    if (a.data_type != b.data_type && a.data_type != data.data_type) {
+        throw std::invalid_argument("Mismatch datatype");
+    } else if (a.data_type == DataType::Float) {
+        FORZ(n, data.n) {
+            FORZ(h, data.h) {
+                auto ptr = data.point<float>(n, h, 0);
+                auto a_ptr = a.point<float>(n, h, 0);
+                auto b_ptr = b.point<float>(n, h, 0);
+                auto output_ptr = output.point<float>(n, h, 0);
+                FORZ(w, data.w) {
+                    FORZ(c, data.c) {
+                        *output_ptr++ = (*a_ptr++) * (*ptr++) + (*b_ptr++);
+                    }
                 }
             }
         }
+    } else if (b.data_type == DataType::Bit) {
+        FORZ(n, data.n) {
+            FORZ(h, data.h) {
+                auto ptr = data.point<uint64_t>(n, h, 0);
+                auto a_ptr = a.point<uint64_t>(n, h, 0);
+                auto b_ptr = b.point<uint64_t>(n, h, 0);
+                auto output_ptr = output.point<uint64_t>(n, h, 0);
+                FORZ(w, data.w) {
+                    FORZ(c, data.c) {
+                        *output_ptr++ = (*a_ptr++) * (*ptr++) + (*b_ptr++);
+                    }
+                }
+            }
+        }
+    } else {
+        throw std::invalid_argument("Unknown datatype");
     }
 }
 

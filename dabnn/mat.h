@@ -656,7 +656,6 @@ inline void Mat::dump(css &filename) {
 }
 
 inline void Mat::display() {
-    std::cout << std::endl;
     std::cout << "----------" << std::endl;
     FORZ(n_i, n) {
         FORZ(h_i, h) {
