@@ -1,5 +1,8 @@
 // Copyright 2019 JD.com Inc. JD AI
 
+#ifndef PAD_H
+#define PAD_H
+
 #include <common/helper.h>
 #include "mat.h"
 
@@ -29,3 +32,5 @@ inline void pad(const bnn::Mat &input, const int pad_h, const int pad_w,
     }
 }
 }  // namespace bnn
+
+#endif /* PAD_H */

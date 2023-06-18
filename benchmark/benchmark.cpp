@@ -13,6 +13,7 @@
 #include <dabnn/layers/Add.cpp>
 #include <dabnn/layers/Affine.cpp>
 #include <dabnn/layers/AvePool.cpp>
+#include <dabnn/layers/MaxPool.cpp>
 #include <dabnn/layers/MaxPool.h>
 
 static void BM_pack_mat_64_small(benchmark::State &state) {
@@ -119,13 +120,29 @@ static void BM_bconv_float_1x1_128(benchmark::State &state) {
     FORZ(i, ALEN) { a_data[i] = 3 * i; }                                 \
     FORZ(i, BLEN) { b_data[i] = 2 * i; }                                 \
                                                                          \
-    const bnn::Mat a(1, AHEIGHT, AWIDTH, CHANNEL * sizeof(uint64_t) * 8, \
+    bnn::Mat a(1, AHEIGHT, AWIDTH, CHANNEL * sizeof(uint64_t) * 8, \
                      a_data, bnn::DataType::Bit);                        \
-    const bnn::Mat b(NUM_OUTPUT, BHEIGHT, BWIDTH,                        \
+    bnn::Mat b(NUM_OUTPUT, BHEIGHT, BWIDTH,                        \
                      CHANNEL * sizeof(uint64_t) * 8, b_data,             \
                      bnn::DataType::Bit, false);                         \
                                                                          \
     bnn::Mat c(1, CHEIGHT, CWIDTH, NUM_OUTPUT, bnn::DataType::Float);
+
+static void BM_bnn_bconv_debug(benchmark::State &state) {
+    SETUP_BCONV(8, 3, 128, 1);
+    for (auto _ : state) {
+        std::cout << "--- Debug BinConv ---" << std::endl;
+        std::cout << "Vector A:" << std::endl;
+        a.display();
+        std::cout << "Vector B:" << std::endl;
+        b.display();
+        std::cout << "Adding vectors A and B..." << std::endl;
+        bnn::baseline_bconv(a, b, BHEIGHT, BWIDTH, 0, 0, 1, 1, 1, 1, NUM_OUTPUT,
+                            c);
+        std::cout << "Vector C:" << std::endl;
+        c.display();
+    }
+}
 
 static void BM_bnn_bconv_3x3_naive_128(benchmark::State &state) {
     SETUP_BCONV(30, 3, 128, 1);
@@ -536,6 +553,47 @@ static void BM_binarize_1024(benchmark::State &state) {
 }
 #undef SETUP_BINARIZE
 
+#define SETUP_BMAXPOOL(n, w, h, c, p)                     \
+    const size_t PWIDTH = p;                              \
+    const size_t PHEIGHT = p;                             \
+    const size_t LENGTH = n * w * h * c;                  \
+                                                          \
+    float a_data[LENGTH];                                 \
+    float b_data[LENGTH];                                 \
+    FORZ(i, LENGTH) { a_data[i] = i * i; }                \
+    FORZ(i, LENGTH) { b_data[i] = 0; }                    \
+                                                          \
+    bnn::Mat a(n, w, h, c, a_data, bnn::DataType::Float); \
+    bnn::Mat b(n, w, h, c, b_data, bnn::DataType::Float);
+
+static void BM_bmaxpool_debug(benchmark::State &state) {
+    SETUP_BMAXPOOL(1, 8, 8, 1, 3);
+    for (auto _ : state) {
+        std::cout << "--- Debug MaxPool ---" << std::endl;
+        std::cout << "Vector A:" << std::endl;
+        a.display();
+        std::cout << "Affine vectors A and B..." << std::endl;
+        bnn::max_pool_fallback(a, 1, 1, 1, 1, PWIDTH, PHEIGHT, b);
+        std::cout << "Vector B:" << std::endl;
+        b.display();
+    }
+}
+
+static void BM_bmaxpool_256(benchmark::State &state) {
+    SETUP_BMAXPOOL(1, 256, 256, 1, 3);
+    for (auto _ : state) {
+        bnn::max_pool_fallback(a, 1, 1, 1, 1, PWIDTH, PHEIGHT, b);
+    }
+}
+
+static void BM_bmaxpool_512(benchmark::State &state) {
+    SETUP_BMAXPOOL(1, 512, 512, 1, 3);
+    for (auto _ : state) {
+        bnn::max_pool_fallback(a, 1, 1, 1, 1, PWIDTH, PHEIGHT, b);
+    }
+}
+#undef SETUP_BMAXPOOL
+
 BENCHMARK_MAIN();
 
 /* ORIGIN */
@@ -588,3 +646,13 @@ BENCHMARK(BM_bavepool_512);
 BENCHMARK(BM_binarize_256);
 BENCHMARK(BM_binarize_1024);
 // BENCHMARK(BM_binarize_debug)->Iterations(1);
+
+// BINCONV
+BENCHMARK(BM_bnn_bconv_3x3_128);
+BENCHMARK(BM_bnn_bconv_3x3_1024);
+// BENCHMARK(BM_bnn_bconv_debug)->Iterations(1);
+
+// MAXPOLL
+BENCHMARK(BM_bmaxpool_256);
+BENCHMARK(BM_bmaxpool_512);
+// BENCHMARK(BM_bmaxpool_debug)->Iterations(1);

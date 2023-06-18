@@ -217,31 +217,62 @@ void max_pool_fallback(const bnn::Mat &input, const size_t pad_h,
 
     BNN_ASSERT(input.w * input.c * input.elemsize % 16 == 0, "Not align");
     BNN_ASSERT(output.w * output.c * output.elemsize % 16 == 0, "Not align");
+    BNN_ASSERT(input.data_type == input.data_type, "Mismatch datatype");
 
     int input_y = 0;
-    FORZ(output_y, output_h) {
-        int input_x = 0;
-        FORZ(output_x, output_w) {
-            FORZ(output_c, input.c) {
-                float m = -std::numeric_limits<float>::max();
-                FORZ(kh, kernel_h) {
-                    int y = input_y - pad_h + kh;
-                    const float *input_ptr = input.point<float>(y, 0);
-                    FORZ(kw, kernel_w) {
-                        int x = input_x - pad_w + kw;
-                        if (!(y < 0 || y >= input.h || x < 0 || x >= input.w)) {
-                            const auto val = input_ptr[x * input.c + output_c];
-                            m = std::max(m, val);
+    
+    if (input.data_type == DataType::Float) {        
+        FORZ(output_y, output_h) {
+            int input_x = 0;
+            FORZ(output_x, output_w) {
+                FORZ(output_c, input.c) {
+                    float m = -std::numeric_limits<float>::max();
+                    FORZ(kh, kernel_h) {
+                        int y = input_y - pad_h + kh;
+                        const float *input_ptr = input.point<float>(y, 0);
+                        FORZ(kw, kernel_w) {
+                            int x = input_x - pad_w + kw;
+                            if (!(y < 0 || y >= input.h || x < 0 || x >= input.w)) {
+                                const auto val = input_ptr[x * input.c + output_c];
+                                m = std::max(m, val);
+                            }
                         }
                     }
-                }
 
-                output[output_y * output_w * input.c + output_x * input.c +
-                       output_c] = m;
+                    output[output_y * output_w * input.c + output_x * input.c +
+                        output_c] = m;
+                }
+                input_x += stride_w;
             }
-            input_x += stride_w;
+            input_y += stride_h;
         }
-        input_y += stride_h;
+    } else if (input.data_type == DataType::Bit) {        
+        FORZ(output_y, output_h) {
+            int input_x = 0;
+            FORZ(output_x, output_w) {
+                FORZ(output_c, input.c) {
+                    uint64_t m = -std::numeric_limits<uint64_t>::max();
+                    FORZ(kh, kernel_h) {
+                        int y = input_y - pad_h + kh;
+                        const uint64_t *input_ptr = input.point<uint64_t>(y, 0);
+                        FORZ(kw, kernel_w) {
+                            int x = input_x - pad_w + kw;
+                            if (!(y < 0 || y >= input.h || x < 0 || x >= input.w)) {
+                                const auto val = input_ptr[x * input.c + output_c];
+                                m = std::max(m, val);
+                            }
+                        }
+                    }
+
+                    output[output_y * output_w * input.c + output_x * input.c +
+                        output_c] = m;
+                }
+                input_x += stride_w;
+            }
+            input_y += stride_h;
+        }
+    } else {
+        throw std::invalid_argument("Unknown datatype");
     }
 }
 
