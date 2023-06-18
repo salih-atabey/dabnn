@@ -406,7 +406,7 @@ static void BM_badd_debug(benchmark::State &state) {
         a.display();
         std::cout << "Vector B:" << std::endl;
         b.display();
-        std::cout << "Adding vectors A and B..." << std::endl;
+        std::cout << "Add vectors A and B..." << std::endl;
         bnn::add_inplace(a, b);
         std::cout << "Vector A:" << std::endl;
         a.display();
@@ -493,7 +493,7 @@ static void BM_bavepool_debug(benchmark::State &state) {
         std::cout << "--- Debug AvePool ---" << std::endl;
         std::cout << "Vector A:" << std::endl;
         a.display();
-        std::cout << "Affine vectors A and B..." << std::endl;
+        std::cout << "AvePool vectors A and B..." << std::endl;
         bnn::ave_pool_fallback(a, 1, 1, 1, 1, PWIDTH, PHEIGHT, b);
         std::cout << "Vector B:" << std::endl;
         b.display();
@@ -573,7 +573,7 @@ static void BM_bmaxpool_debug(benchmark::State &state) {
         std::cout << "--- Debug MaxPool ---" << std::endl;
         std::cout << "Vector A:" << std::endl;
         a.display();
-        std::cout << "Affine vectors A and B..." << std::endl;
+        std::cout << "MaxPool vectors A and B..." << std::endl;
         bnn::max_pool_fallback(a, 1, 1, 1, 1, PWIDTH, PHEIGHT, b);
         std::cout << "Vector B:" << std::endl;
         b.display();
@@ -615,7 +615,7 @@ static void BM_bpad_debug(benchmark::State &state) {
         std::cout << "--- Debug Pad ---" << std::endl;
         std::cout << "Vector A:" << std::endl;
         a.display();
-        std::cout << "Affine vectors A and B..." << std::endl;
+        std::cout << "Pad vector A..." << std::endl;
         bnn::pad(a, PWIDTH, PHEIGHT, b, 0.f);
         std::cout << "Vector B:" << std::endl;
         b.display();
