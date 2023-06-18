@@ -14,6 +14,7 @@
 #include <dabnn/layers/Affine.cpp>
 #include <dabnn/layers/AvePool.cpp>
 #include <dabnn/layers/MaxPool.cpp>
+#include <dabnn/layers/Pad.cpp>
 #include <dabnn/layers/MaxPool.h>
 
 static void BM_pack_mat_64_small(benchmark::State &state) {
@@ -594,6 +595,48 @@ static void BM_bmaxpool_512(benchmark::State &state) {
 }
 #undef SETUP_BMAXPOOL
 
+#define SETUP_BPAD(n, w, h, c, p)                     \
+    const size_t PWIDTH = p;                              \
+    const size_t PHEIGHT = p;                             \
+    const size_t ALENGTH = n * w * h * c;                  \
+    const size_t BLENGTH = n * (w+p) * (h+p) * c;         \
+                                                          \
+    uint64_t a_data[ALENGTH];                                 \
+    uint64_t b_data[BLENGTH];                                 \
+    FORZ(i, ALENGTH) { a_data[i] = 1; }                \
+    FORZ(i, BLENGTH) { b_data[i] = 1; }                    \
+                                                          \
+    bnn::Mat a(n, w, h, c, a_data, bnn::DataType::Bit); \
+    bnn::Mat b(n, w+p, h+p, c, b_data, bnn::DataType::Bit);
+
+static void BM_bpad_debug(benchmark::State &state) {
+    SETUP_BPAD(1, 4, 4, 64, 4);
+    for (auto _ : state) {
+        std::cout << "--- Debug Pad ---" << std::endl;
+        std::cout << "Vector A:" << std::endl;
+        a.display();
+        std::cout << "Affine vectors A and B..." << std::endl;
+        bnn::pad(a, PWIDTH, PHEIGHT, b, 0.f);
+        std::cout << "Vector B:" << std::endl;
+        b.display();
+    }
+}
+
+static void BM_bpad_16(benchmark::State &state) {
+    SETUP_BPAD(1, 16, 16, 64, 16);
+    for (auto _ : state) {
+        bnn::pad(a, PWIDTH, PHEIGHT, b, 0.f);
+    }
+}
+
+static void BM_bpad_32(benchmark::State &state) {
+    SETUP_BPAD(1, 32, 32, 64, 32);
+    for (auto _ : state) {
+        bnn::pad(a, PWIDTH, PHEIGHT, b, 0.f);
+    }
+}
+#undef SETUP_BPAD
+
 BENCHMARK_MAIN();
 
 /* ORIGIN */
@@ -656,3 +699,8 @@ BENCHMARK(BM_bnn_bconv_3x3_1024);
 BENCHMARK(BM_bmaxpool_256);
 BENCHMARK(BM_bmaxpool_512);
 // BENCHMARK(BM_bmaxpool_debug)->Iterations(1);
+
+// PAD
+BENCHMARK(BM_bpad_16);
+BENCHMARK(BM_bpad_32);
+// BENCHMARK(BM_bpad_debug)->Iterations(1);
