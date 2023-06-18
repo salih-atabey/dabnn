@@ -3,6 +3,11 @@
 cmake_minimum_required(VERSION 3.9)
 project(dabnn CXX)
 
+set(CMAKE_PREFIX_PATH "/usr/local/cuda/include/thrust" ${CMAKE_PREFIX_PATH})
+
+find_package(CUDA REQUIRED)
+include_directories("${CUDA_INCLUDE_DIRS}")
+
 message(STATUS "CMake Version: ${CMAKE_VERSION}")
 
 if (NOT CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE STREQUAL "")

@@ -1,6 +1,6 @@
 # Copyright 2019 JD.com Inc. JD AI
 
-add_library(dabnn
+CUDA_ADD_LIBRARY(dabnn SHARED
     allocator.cpp
     allocator.h
     mat.h
@@ -37,6 +37,7 @@ add_library(dabnn
     layer.cpp
     ${PROJECT_SOURCE_DIR}/common/Shaper.cpp
     ${PROJECT_SOURCE_DIR}/common/Shaper.h
+    OPTIONS -arch sm_70
     )
 target_include_directories(dabnn
     PUBLIC
@@ -51,6 +52,7 @@ target_include_directories(dabnn
 target_link_libraries(dabnn
     glog::glog
     flatbuffers
+    ${CUDA_LIBRARIES}
     )
 
 if (${BNN_BUILD_JNI})
