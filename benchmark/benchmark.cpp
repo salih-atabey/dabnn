@@ -2,16 +2,20 @@
 
 #include <chrono>
 #include <memory>
-
 #include <benchmark/benchmark.h>
 #include <common/baseline.h>
 #include <common/helper.h>
 #include <dabnn/bconv.h>
 #include <dabnn/bgemm.h>
 #include <dabnn/bitpack.h>
-#include <dabnn/layers/MaxPool.h>
 #include <dabnn/mat.h>
 #include <dabnn/net.h>
+#include <dabnn/layers/Add.cpp>
+#include <dabnn/layers/Affine.cpp>
+#include <dabnn/layers/AvePool.cpp>
+#include <dabnn/layers/MaxPool.cpp>
+#include <dabnn/layers/Pad.cpp>
+#include <dabnn/layers/MaxPool.h>
 
 static void BM_pack_mat_64_small(benchmark::State &state) {
     const bnn::Mat a(1, 32, 32, 128, bnn::DataType::Float, false);
@@ -117,13 +121,29 @@ static void BM_bconv_float_1x1_128(benchmark::State &state) {
     FORZ(i, ALEN) { a_data[i] = 3 * i; }                                 \
     FORZ(i, BLEN) { b_data[i] = 2 * i; }                                 \
                                                                          \
-    const bnn::Mat a(1, AHEIGHT, AWIDTH, CHANNEL * sizeof(uint64_t) * 8, \
+    bnn::Mat a(1, AHEIGHT, AWIDTH, CHANNEL * sizeof(uint64_t) * 8, \
                      a_data, bnn::DataType::Bit);                        \
-    const bnn::Mat b(NUM_OUTPUT, BHEIGHT, BWIDTH,                        \
+    bnn::Mat b(NUM_OUTPUT, BHEIGHT, BWIDTH,                        \
                      CHANNEL * sizeof(uint64_t) * 8, b_data,             \
                      bnn::DataType::Bit, false);                         \
                                                                          \
     bnn::Mat c(1, CHEIGHT, CWIDTH, NUM_OUTPUT, bnn::DataType::Float);
+
+static void BM_bnn_bconv_debug(benchmark::State &state) {
+    SETUP_BCONV(8, 3, 128, 1);
+    for (auto _ : state) {
+        std::cout << "--- Debug BinConv ---" << std::endl;
+        std::cout << "Vector A:" << std::endl;
+        a.display();
+        std::cout << "Vector B:" << std::endl;
+        b.display();
+        std::cout << "Adding vectors A and B..." << std::endl;
+        bnn::baseline_bconv(a, b, BHEIGHT, BWIDTH, 0, 0, 1, 1, 1, 1, NUM_OUTPUT,
+                            c);
+        std::cout << "Vector C:" << std::endl;
+        c.display();
+    }
+}
 
 static void BM_bnn_bconv_3x3_naive_128(benchmark::State &state) {
     SETUP_BCONV(30, 3, 128, 1);
@@ -323,7 +343,7 @@ static void BM_bireal18_imagenet(benchmark::State &state) {
     float input[3 * 224 * 224];
 
     auto net = bnn::Net::create();
-    net->read("/data/local/tmp/model_imagenet.dab");
+    net->read("/workspace/dabnn/models/birealnet18.dab");
     for (auto _ : state) {
         net->run(input);
     }
@@ -333,7 +353,7 @@ static void BM_bireal18_imagenet_stem(benchmark::State &state) {
     float input[3 * 224 * 224];
 
     auto net = bnn::Net::create();
-    net->read("/data/local/tmp/model_imagenet_stem.dab");
+    net->read("/workspace/dabnn/models/birealnet18stem.dab");
     for (auto _ : state) {
         net->run(input);
     }
@@ -363,8 +383,263 @@ static void BM_bireal18_imagenet_wo_fconv(benchmark::State &state) {
     }
 }
 
+#define SETUP_BADD(n, w, h, c)                          \
+    const size_t LENGTH = n * w * h * c;                \
+                                                        \
+    uint64_t a_data[LENGTH];                            \
+    uint64_t b_data[LENGTH];                            \
+    FORZ(i, LENGTH) { a_data[i] = 3 * i; }              \
+    FORZ(i, LENGTH) { b_data[i] = 2 * i; }              \
+                                                        \
+    bnn::Mat a(n, w, h, c, a_data, bnn::DataType::Bit); \
+    bnn::Mat b(n, w, h, c, b_data, bnn::DataType::Bit);
+
+static void BM_badd_debug(benchmark::State &state) {
+    SETUP_BADD(2, 4, 4, 256);
+    for (auto _ : state) {
+        std::cout << "--- Debug Add ---" << std::endl;
+        std::cout << "a.n: " << a.n << std::endl;
+        std::cout << "a.h: " << a.h << std::endl;
+        std::cout << "a.w: " << a.w << std::endl;
+        std::cout << "a.c: " << a.c << std::endl;
+        std::cout << "Vector A:" << std::endl;
+        a.display();
+        std::cout << "Vector B:" << std::endl;
+        b.display();
+        std::cout << "Add vectors A and B..." << std::endl;
+        bnn::add_inplace(a, b);
+        std::cout << "Vector A:" << std::endl;
+        a.display();
+    }
+}
+
+static void BM_badd_256(benchmark::State &state) {
+    SETUP_BADD(1, 1, 256, 64);
+    for (auto _ : state) {
+        bnn::add_inplace(a, b);
+    }
+}
+
+static void BM_badd_1024(benchmark::State &state) {
+    SETUP_BADD(1, 1, 1024, 64);
+    for (auto _ : state) {
+        bnn::add_inplace(a, b);
+    }
+}
+#undef SETUP_BADD
+
+#define SETUP_BAFFINE(n, w, h, c)                       \
+    const size_t LENGTH = n * w * h * c;                \
+                                                        \
+    uint64_t a_data[LENGTH];                            \
+    uint64_t x_data[LENGTH];                            \
+    uint64_t b_data[LENGTH];                            \
+    FORZ(i, LENGTH) { a_data[i] = 13; }                 \
+    FORZ(i, LENGTH) { x_data[i] = 7; }                  \
+    FORZ(i, LENGTH) { b_data[i] = 5; }                  \
+                                                        \
+    bnn::Mat a(n, w, h, c, a_data, bnn::DataType::Bit); \
+    bnn::Mat x(n, w, h, c, x_data, bnn::DataType::Bit); \
+    bnn::Mat b(n, w, h, c, b_data, bnn::DataType::Bit);
+
+static void BM_baffine_debug(benchmark::State &state) {
+    SETUP_BAFFINE(1, 4, 4, 64);
+    for (auto _ : state) {
+        std::cout << "--- Debug Affine ---" << std::endl;
+        std::cout << "Vector A:" << std::endl;
+        a.display();
+        std::cout << "Vector X:" << std::endl;
+        x.display();
+        std::cout << "Vector B:" << std::endl;
+        b.display();
+        std::cout << "Affine vectors A and B..." << std::endl;
+        bnn::affine_inplace(a, x, b);
+        std::cout << "Vector A:" << std::endl;
+        a.display();
+    }
+}
+
+static void BM_baffine_256(benchmark::State &state) {
+    SETUP_BAFFINE(1, 1, 256, 64);
+    for (auto _ : state) {
+        bnn::affine_inplace(a, x, b);
+    }
+}
+
+static void BM_baffine_1024(benchmark::State &state) {
+    SETUP_BAFFINE(1, 1, 1024, 64);
+    for (auto _ : state) {
+        bnn::affine_inplace(a, x, b);
+    }
+}
+#undef SETUP_BAFFINE
+
+#define SETUP_BAVEPOOL(n, w, h, c, p)                     \
+    const size_t PWIDTH = p;                              \
+    const size_t PHEIGHT = p;                             \
+    const size_t LENGTH = n * w * h * c;                  \
+                                                          \
+    float a_data[LENGTH];                                 \
+    float b_data[LENGTH];                                 \
+    FORZ(i, LENGTH) { a_data[i] = i * i; }                \
+    FORZ(i, LENGTH) { b_data[i] = 0; }                    \
+                                                          \
+    bnn::Mat a(n, w, h, c, a_data, bnn::DataType::Float); \
+    bnn::Mat b(n, w, h, c, b_data, bnn::DataType::Float);
+
+static void BM_bavepool_debug(benchmark::State &state) {
+    SETUP_BAVEPOOL(1, 8, 8, 1, 3);
+    for (auto _ : state) {
+        std::cout << "--- Debug AvePool ---" << std::endl;
+        std::cout << "Vector A:" << std::endl;
+        a.display();
+        std::cout << "AvePool vectors A and B..." << std::endl;
+        bnn::ave_pool_fallback(a, 1, 1, 1, 1, PWIDTH, PHEIGHT, b);
+        std::cout << "Vector B:" << std::endl;
+        b.display();
+    }
+}
+
+static void BM_bavepool_256(benchmark::State &state) {
+    SETUP_BAVEPOOL(1, 256, 256, 1, 3);
+    for (auto _ : state) {
+        bnn::ave_pool_fallback(a, 1, 1, 1, 1, PWIDTH, PHEIGHT, b);
+    }
+}
+
+static void BM_bavepool_512(benchmark::State &state) {
+    SETUP_BAVEPOOL(1, 512, 512, 1, 3);
+    for (auto _ : state) {
+        bnn::ave_pool_fallback(a, 1, 1, 1, 1, PWIDTH, PHEIGHT, b);
+    }
+}
+#undef SETUP_BAVEPOOL
+
+#define SETUP_BINARIZE(n, w, h, c)                           \
+    const size_t LENGTH = n * w * h * c;               \
+                                                             \
+    float a_data[LENGTH];                                   \
+    uint64_t b_data[LENGTH];                                \
+    FORZ(i, LENGTH) { a_data[i] = 1; }                  \
+    FORZ(i, LENGTH) { b_data[i] = 0; }                      \
+                                                             \
+    bnn::Mat a(n, w, h, c, a_data, bnn::DataType::Float); \
+    bnn::Mat b(n, w, h, c, b_data, bnn::DataType::Bit);
+
+static void BM_binarize_debug(benchmark::State &state) {
+    SETUP_BINARIZE(1, 4, 4, 64);
+    for (auto _ : state) {
+        std::cout << "--- Debug Binarize ---" << std::endl;
+        std::cout << "Vector A:" << std::endl;
+        a.display();
+        std::cout << "Binarize vector A..." << std::endl;
+        bnn::pack_mat(a, b);
+        std::cout << "Vector B:" << std::endl;
+        b.display();
+    }
+}
+
+static void BM_binarize_256(benchmark::State &state) {
+    SETUP_BINARIZE(1, 1, 256, 64);
+    for (auto _ : state) {
+        bnn::pack_mat(a, b);
+    }
+}
+
+static void BM_binarize_1024(benchmark::State &state) {
+    SETUP_BINARIZE(1, 1, 1024, 64);
+    for (auto _ : state) {
+        bnn::pack_mat(a, b);
+    }
+}
+#undef SETUP_BINARIZE
+
+#define SETUP_BMAXPOOL(n, w, h, c, p)                     \
+    const size_t PWIDTH = p;                              \
+    const size_t PHEIGHT = p;                             \
+    const size_t LENGTH = n * w * h * c;                  \
+                                                          \
+    float a_data[LENGTH];                                 \
+    float b_data[LENGTH];                                 \
+    FORZ(i, LENGTH) { a_data[i] = i * i; }                \
+    FORZ(i, LENGTH) { b_data[i] = 0; }                    \
+                                                          \
+    bnn::Mat a(n, w, h, c, a_data, bnn::DataType::Float); \
+    bnn::Mat b(n, w, h, c, b_data, bnn::DataType::Float);
+
+static void BM_bmaxpool_debug(benchmark::State &state) {
+    SETUP_BMAXPOOL(1, 8, 8, 1, 3);
+    for (auto _ : state) {
+        std::cout << "--- Debug MaxPool ---" << std::endl;
+        std::cout << "Vector A:" << std::endl;
+        a.display();
+        std::cout << "MaxPool vectors A and B..." << std::endl;
+        bnn::max_pool_fallback(a, 1, 1, 1, 1, PWIDTH, PHEIGHT, b);
+        std::cout << "Vector B:" << std::endl;
+        b.display();
+    }
+}
+
+static void BM_bmaxpool_256(benchmark::State &state) {
+    SETUP_BMAXPOOL(1, 256, 256, 1, 3);
+    for (auto _ : state) {
+        bnn::max_pool_fallback(a, 1, 1, 1, 1, PWIDTH, PHEIGHT, b);
+    }
+}
+
+static void BM_bmaxpool_512(benchmark::State &state) {
+    SETUP_BMAXPOOL(1, 512, 512, 1, 3);
+    for (auto _ : state) {
+        bnn::max_pool_fallback(a, 1, 1, 1, 1, PWIDTH, PHEIGHT, b);
+    }
+}
+#undef SETUP_BMAXPOOL
+
+#define SETUP_BPAD(n, w, h, c, p)                     \
+    const size_t PWIDTH = p;                              \
+    const size_t PHEIGHT = p;                             \
+    const size_t ALENGTH = n * w * h * c;                  \
+    const size_t BLENGTH = n * (w+p) * (h+p) * c;         \
+                                                          \
+    uint64_t a_data[ALENGTH];                                 \
+    uint64_t b_data[BLENGTH];                                 \
+    FORZ(i, ALENGTH) { a_data[i] = 1; }                \
+    FORZ(i, BLENGTH) { b_data[i] = 1; }                    \
+                                                          \
+    bnn::Mat a(n, w, h, c, a_data, bnn::DataType::Bit); \
+    bnn::Mat b(n, w+p, h+p, c, b_data, bnn::DataType::Bit);
+
+static void BM_bpad_debug(benchmark::State &state) {
+    SETUP_BPAD(1, 4, 4, 64, 4);
+    for (auto _ : state) {
+        std::cout << "--- Debug Pad ---" << std::endl;
+        std::cout << "Vector A:" << std::endl;
+        a.display();
+        std::cout << "Pad vector A..." << std::endl;
+        bnn::pad(a, PWIDTH, PHEIGHT, b, 0.f);
+        std::cout << "Vector B:" << std::endl;
+        b.display();
+    }
+}
+
+static void BM_bpad_16(benchmark::State &state) {
+    SETUP_BPAD(1, 16, 16, 64, 16);
+    for (auto _ : state) {
+        bnn::pad(a, PWIDTH, PHEIGHT, b, 0.f);
+    }
+}
+
+static void BM_bpad_32(benchmark::State &state) {
+    SETUP_BPAD(1, 32, 32, 64, 32);
+    for (auto _ : state) {
+        bnn::pad(a, PWIDTH, PHEIGHT, b, 0.f);
+    }
+}
+#undef SETUP_BPAD
+
 BENCHMARK_MAIN();
 
+/* ORIGIN */
 // BENCHMARK(BM_pack_mat_64);
 // BENCHMARK(BM_pack_mat_128);
 // BENCHMARK(BM_bnn_bconv_1x1_64);
@@ -374,19 +649,58 @@ BENCHMARK_MAIN();
 // BENCHMARK(BM_bgemm_128);
 // BENCHMARK(BM_bgemm_256);
 // BENCHMARK(BM_bgemm_256_s2);
-BENCHMARK(BM_bgemm_5x5_256);
+// BENCHMARK(BM_bgemm_5x5_256);
 // BENCHMARK(BM_bgemm_512);
-BENCHMARK(BM_bnn_bconv_3x3_64);
-BENCHMARK(BM_bnn_bconv_3x3_128);
-BENCHMARK(BM_bnn_bconv_3x3_256);
-BENCHMARK(BM_bnn_bconv_3x3_256_s2);
-BENCHMARK(BM_bnn_bconv_3x3_512);
+// BENCHMARK(BM_bnn_bconv_3x3_64);
+// BENCHMARK(BM_bnn_bconv_3x3_128);
+// BENCHMARK(BM_bnn_bconv_3x3_256);
+// BENCHMARK(BM_bnn_bconv_3x3_256_s2);
+// BENCHMARK(BM_bnn_bconv_3x3_512);
 // BENCHMARK(BM_bnn_bconv_3x3_1024);
 // BENCHMARK(BM_bireal18_cifar_wo_fconv);
 // BENCHMARK(BM_bireal18_imagenet_wo_fconv);
 // BENCHMARK(BM_bireal18_cifar);
-BENCHMARK(BM_bireal18_imagenet);
-BENCHMARK(BM_bireal18_imagenet_stem);
+// BENCHMARK(BM_bireal18_imagenet);
+// BENCHMARK(BM_bireal18_imagenet_stem);
 // BENCHMARK(BM_bnn_bconv_3x3_naive_128);
 // BENCHMARK(BM_bconv_float_1x1_128);
 // BENCHMARK(BM_bconv_float_3x3_128);
+
+// BIREAL
+BENCHMARK(BM_bireal18_imagenet);
+BENCHMARK(BM_bireal18_imagenet_stem);
+
+// ADD
+BENCHMARK(BM_badd_256);
+BENCHMARK(BM_badd_1024);
+// BENCHMARK(BM_badd_debug)->Iterations(1);
+
+// AFFINE
+BENCHMARK(BM_baffine_256);
+BENCHMARK(BM_baffine_1024);
+// BENCHMARK(BM_baffine_debug)->Iterations(1);
+
+// AVEPOLL
+BENCHMARK(BM_bavepool_256);
+BENCHMARK(BM_bavepool_512);
+// BENCHMARK(BM_bavepool_debug)->Iterations(1);
+
+// BINARIZE
+BENCHMARK(BM_binarize_256);
+BENCHMARK(BM_binarize_1024);
+// BENCHMARK(BM_binarize_debug)->Iterations(1);
+
+// BINCONV
+BENCHMARK(BM_bnn_bconv_3x3_128);
+BENCHMARK(BM_bnn_bconv_3x3_1024);
+// BENCHMARK(BM_bnn_bconv_debug)->Iterations(1);
+
+// MAXPOLL
+BENCHMARK(BM_bmaxpool_256);
+BENCHMARK(BM_bmaxpool_512);
+// BENCHMARK(BM_bmaxpool_debug)->Iterations(1);
+
+// PAD
+BENCHMARK(BM_bpad_16);
+BENCHMARK(BM_bpad_32);
+// BENCHMARK(BM_bpad_debug)->Iterations(1);

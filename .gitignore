@@ -14,3 +14,7 @@ tools/onnx2bnn/python/dist/
 tools/onnx2bnn/python/onnx2bnn.egg-info/
 .clangd/
 .build*/
+*.pdf
+.vscode/*
+templates
+models/*

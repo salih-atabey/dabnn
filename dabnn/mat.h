@@ -152,6 +152,8 @@ class Mat {
     size_t data_num_ = 0;
 
     std::string name;
+
+    void display();
 };
 
 inline Mat::Mat()
@@ -651,6 +653,33 @@ inline Mat Mat::flatten() { return Mat(total(), data, data_type); }
 inline void Mat::dump(css &filename) {
     std::ofstream ofs(filename);
     FORZ(i, total()) { ofs << (*this)[i] << std::endl; }
+}
+
+inline void Mat::display() {
+    std::cout << "----------" << std::endl;
+    FORZ(n_i, n) {
+        FORZ(h_i, h) {
+            if (data_type == DataType::Float) {
+                auto *ptr = point<float>(n_i, h_i, 0);
+                FORZ(w_i, w) {
+                    std::cout << "(";
+                    FORZ(c_i, c) { std::cout << *ptr++ << ", "; }
+                    std::cout << ") ";
+                }
+            } else if (data_type == DataType::Bit) {
+                auto *ptr = point<uint64_t>(n_i, h_i, 0);
+                FORZ(w_i, w) {
+                    std::cout << "(";
+                    FORZ(c_i, c) { std::cout << std::hex << *ptr++ << ", "; }
+                    std::cout << ") ";
+                }
+            } else {
+                throw std::invalid_argument("Unknown datatype");
+            }
+            std::cout << std::endl;
+        }
+        std::cout << "----------" << std::endl;
+    }
 }
 
 }  // namespace bnn
