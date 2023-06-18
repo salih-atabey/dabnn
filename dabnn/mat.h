@@ -89,6 +89,10 @@ class Mat {
     void release();
 
     bool empty() const;
+    template <typename T>
+    T* begin();
+    template <typename T>
+    T* end();
     size_t total() const;
 
     void dump(css &filename);
@@ -595,6 +599,16 @@ inline void Mat::release() {
 }
 
 inline bool Mat::empty() const { return data == nullptr || total() == 0; }
+
+template <typename T>
+inline T* Mat::begin() {
+    return (T*)data;
+}
+
+template <typename T>
+inline T* Mat::end() {
+    return (T*)data + total();
+}
 
 inline size_t Mat::total() const {
     if (data_num_ != 0) {

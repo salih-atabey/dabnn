@@ -37,7 +37,7 @@ CUDA_ADD_LIBRARY(dabnn SHARED
     layer.cpp
     ${PROJECT_SOURCE_DIR}/common/Shaper.cpp
     ${PROJECT_SOURCE_DIR}/common/Shaper.h
-    OPTIONS -arch sm_70
+    OPTIONS -arch compute_61 -code sm_61
     )
 target_include_directories(dabnn
     PUBLIC

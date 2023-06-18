@@ -4,58 +4,39 @@
 
 namespace bnn {
 
-inline void add_inplace(bnn::Mat &a, const bnn::Mat &b) {
+// Functor for adding a value from all pixels in an image
+template<typename T>
+struct add_functor {
+    __host__ __device__
+    T operator()(T a, T b) {
+        return a + b;
+    }
+};
+
+inline void add_inplace(bnn::Mat &a, bnn::Mat &b) {
     if (a.data_type != b.data_type) {
         throw std::invalid_argument("Mismatch datatype");
     } else if (a.data_type == DataType::Float) {
-        FORZ(n, a.n) {
-            FORZ(h, a.h) {
-                auto *a_ptr = a.point<float>(n, h, 0);
-                const auto *b_ptr = b.point<float>(n, h, 0);
-                FORZ(w, a.w) {
-                    FORZ(c, a.c) { *a_ptr++ += *b_ptr++; }
-                }
-            }
-        }
+        add_functor<float> func;
+        thrust::transform(a.begin<float>(), a.end<float>(), b.begin<float>(), a.begin<float>(), func);
     } else if (b.data_type == DataType::Bit) {
-        FORZ(n, a.n) {
-            FORZ(h, a.h) {
-                auto *a_ptr = a.point<uint64_t>(n, h, 0);
-                const auto *b_ptr = b.point<uint64_t>(n, h, 0);
-                FORZ(w, a.w) {
-                    FORZ(c, a.c) { *a_ptr++ += *b_ptr++; }
-                }
-            }
-        }
+        add_functor<uint64_t> func;
+        thrust::transform(a.begin<uint64_t>(), a.end<uint64_t>(), b.begin<uint64_t>(), a.begin<uint64_t>(), func);
     } else {
         throw std::invalid_argument("Unknown datatype");
     }
+    cudaDeviceSynchronize();
 }
 
-inline void add(const bnn::Mat &a, const bnn::Mat &b, bnn::Mat &c) {
+inline void add(bnn::Mat &a, bnn::Mat &b, bnn::Mat &c) {
     if (a.data_type != b.data_type) {
         throw std::invalid_argument("Mismatch datatype");
-        FORZ(n, a.n) {
-            FORZ(h, a.h) {
-                const auto *a_ptr = a.point<float>(n, h, 0);
-                const auto *b_ptr = b.point<float>(n, h, 0);
-                auto *c_ptr = c.point<float>(n, h, 0);
-                FORZ(w, a.w) {
-                    FORZ(c, a.c) { *c_ptr++ = *a_ptr++ + *b_ptr++; }
-                }
-            }
-        }
+    } else if (a.data_type == DataType::Float) {
+        add_functor<float> func;
+        thrust::transform(a.begin<float>(), a.end<float>(), b.begin<float>(), c.begin<float>(), func);
     } else if (b.data_type == DataType::Bit) {
-        FORZ(n, a.n) {
-            FORZ(h, a.h) {
-                const auto *a_ptr = a.point<uint64_t>(n, h, 0);
-                const auto *b_ptr = b.point<uint64_t>(n, h, 0);
-                auto *c_ptr = c.point<float>(n, h, 0);
-                FORZ(w, a.w) {
-                    FORZ(c, a.c) { *c_ptr++ = *a_ptr++ + *b_ptr++; }
-                }
-            }
-        }
+        add_functor<uint64_t> func;
+        thrust::transform(a.begin<uint64_t>(), a.end<uint64_t>(), b.begin<uint64_t>(), c.begin<uint64_t>(), func);
     } else {
         throw std::invalid_argument("Unknown datatype");
     }
