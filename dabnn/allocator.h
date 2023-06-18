@@ -28,6 +28,9 @@
 #include <stdlib.h>
 #include <list>
 
+#include <cuda.h>
+#include <cuda_runtime.h>
+
 namespace ncnn {
 
 // the alignment of all the allocated buffers
@@ -48,8 +51,9 @@ static inline _Tp *alignPtr(_Tp *ptr, int n = (int)sizeof(_Tp)) {
 static inline size_t alignSize(size_t sz, int n) { return (sz + n - 1) & -n; }
 
 static inline void *fastMalloc(size_t size) {
-    unsigned char *udata =
-        (unsigned char *)malloc(size + sizeof(void *) + MALLOC_ALIGN);
+    // unsigned char *udata = (unsigned char *)malloc(size + sizeof(void *) + MALLOC_ALIGN);
+    unsigned char *udata;
+    cudaMallocManaged((void**) &udata, size + sizeof(void *) + MALLOC_ALIGN);
     if (!udata) return 0;
     unsigned char **adata = alignPtr((unsigned char **)udata + 1, MALLOC_ALIGN);
     adata[-1] = udata;
@@ -59,7 +63,8 @@ static inline void *fastMalloc(size_t size) {
 static inline void fastFree(void *ptr) {
     if (ptr) {
         unsigned char *udata = ((unsigned char **)ptr)[-1];
-        free(udata);
+        // free(udata);
+        cudaFree(udata);
     }
 }
 

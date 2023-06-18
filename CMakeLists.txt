@@ -6,7 +6,7 @@ project(dabnn CXX)
 set(CMAKE_PREFIX_PATH "/usr/local/cuda/include/thrust" ${CMAKE_PREFIX_PATH})
 
 find_package(CUDA REQUIRED)
-include_directories("${CUDA_INCLUDE_DIRS}")
+include_directories(${CUDA_INCLUDE_DIRS})
 
 message(STATUS "CMake Version: ${CMAKE_VERSION}")
 

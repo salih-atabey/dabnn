@@ -2,6 +2,8 @@
 
 #include <chrono>
 #include <memory>
+#include <cuda.h>
+#include <cuda_runtime.h>
 #include <benchmark/benchmark.h>
 #include <common/baseline.h>
 #include <common/helper.h>
@@ -101,32 +103,33 @@ static void BM_bconv_float_1x1_128(benchmark::State &state) {
 
 #undef SETUP_BCONV_FLOAT
 
-#define SETUP_BCONV(size_a, size_b, num_output, stride)                  \
-    const size_t AHEIGHT = size_a;                                       \
-    const size_t AWIDTH = size_a;                                        \
-    const size_t CHANNEL = num_output / 64;                              \
-                                                                         \
-    const size_t BHEIGHT = size_b;                                       \
-    const size_t BWIDTH = size_b;                                        \
-    const size_t NUM_OUTPUT = num_output;                                \
-                                                                         \
-    const size_t CHEIGHT = (AHEIGHT - BHEIGHT + 1) / stride;             \
-    const size_t CWIDTH = (AWIDTH - BWIDTH + 1) / stride;                \
-                                                                         \
-    const size_t ALEN = AHEIGHT * AWIDTH * CHANNEL;                      \
-    const size_t BLEN = NUM_OUTPUT * BHEIGHT * BWIDTH * CHANNEL;         \
-                                                                         \
-    uint64_t a_data[ALEN];                                               \
-    uint64_t b_data[BLEN];                                               \
-    FORZ(i, ALEN) { a_data[i] = 3 * i; }                                 \
-    FORZ(i, BLEN) { b_data[i] = 2 * i; }                                 \
-                                                                         \
-    bnn::Mat a(1, AHEIGHT, AWIDTH, CHANNEL * sizeof(uint64_t) * 8, \
-                     a_data, bnn::DataType::Bit);                        \
-    bnn::Mat b(NUM_OUTPUT, BHEIGHT, BWIDTH,                        \
-                     CHANNEL * sizeof(uint64_t) * 8, b_data,             \
-                     bnn::DataType::Bit, false);                         \
-                                                                         \
+#define SETUP_BCONV(size_a, size_b, num_output, stride)                     \
+    const size_t AHEIGHT = size_a;                                          \
+    const size_t AWIDTH = size_a;                                           \
+    const size_t CHANNEL = num_output / 64;                                 \
+                                                                            \
+    const size_t BHEIGHT = size_b;                                          \
+    const size_t BWIDTH = size_b;                                           \
+    const size_t NUM_OUTPUT = num_output;                                   \
+                                                                            \
+    const size_t CHEIGHT = (AHEIGHT - BHEIGHT + 1) / stride;                \
+    const size_t CWIDTH = (AWIDTH - BWIDTH + 1) / stride;                   \
+                                                                            \
+    const size_t ALEN = AHEIGHT * AWIDTH * CHANNEL;                         \
+    const size_t BLEN = NUM_OUTPUT * BHEIGHT * BWIDTH * CHANNEL;            \
+                                                                            \
+    uint64_t *a_data;                                                       \
+    uint64_t *b_data;                                                       \
+    cudaMallocManaged((void **)&a_data, ALEN);                              \
+    cudaMallocManaged((void **)&b_data, ALEN);                              \
+    FORZ(i, ALEN) { a_data[i] = 3 * i; }                                    \
+    FORZ(i, BLEN) { b_data[i] = 2 * i; }                                    \
+                                                                            \
+    bnn::Mat a(1, AHEIGHT, AWIDTH, CHANNEL * sizeof(uint64_t) * 8, a_data,  \
+               bnn::DataType::Bit);                                         \
+    bnn::Mat b(NUM_OUTPUT, BHEIGHT, BWIDTH, CHANNEL * sizeof(uint64_t) * 8, \
+               b_data, bnn::DataType::Bit, false);                          \
+                                                                            \
     bnn::Mat c(1, CHEIGHT, CWIDTH, NUM_OUTPUT, bnn::DataType::Float);
 
 static void BM_bnn_bconv_debug(benchmark::State &state) {
@@ -143,6 +146,8 @@ static void BM_bnn_bconv_debug(benchmark::State &state) {
         std::cout << "Vector C:" << std::endl;
         c.display();
     }
+    cudaFree(a_data);
+    cudaFree(b_data);
 }
 
 static void BM_bnn_bconv_3x3_naive_128(benchmark::State &state) {
@@ -203,6 +208,8 @@ static void BM_bnn_bconv_3x3_128(benchmark::State &state) {
     for (auto _ : state) {
         bnn::bconv_3x3(a, b, c);
     }
+    cudaFree(a_data);
+    cudaFree(b_data);
 }
 
 static void BM_bnn_bconv_3x3_256(benchmark::State &state) {
@@ -231,6 +238,8 @@ static void BM_bnn_bconv_3x3_1024(benchmark::State &state) {
     for (auto _ : state) {
         bnn::bconv_3x3(a, b, c);
     }
+    cudaFree(a_data);
+    cudaFree(b_data);
 }
 
 static void BM_bnn_bconv(benchmark::State &state) {
@@ -386,8 +395,10 @@ static void BM_bireal18_imagenet_wo_fconv(benchmark::State &state) {
 #define SETUP_BADD(n, w, h, c)                          \
     const size_t LENGTH = n * w * h * c;                \
                                                         \
-    uint64_t a_data[LENGTH];                            \
-    uint64_t b_data[LENGTH];                            \
+    uint64_t *a_data;                                   \
+    uint64_t *b_data;                                   \
+    cudaMallocManaged((void **)&a_data, LENGTH);        \
+    cudaMallocManaged((void **)&b_data, LENGTH);        \
     FORZ(i, LENGTH) { a_data[i] = 3 * i; }              \
     FORZ(i, LENGTH) { b_data[i] = 2 * i; }              \
                                                         \
@@ -411,6 +422,8 @@ static void BM_badd_debug(benchmark::State &state) {
         std::cout << "Vector A:" << std::endl;
         a.display();
     }
+    cudaFree(a_data);
+    cudaFree(b_data);
 }
 
 static void BM_badd_256(benchmark::State &state) {
@@ -418,6 +431,8 @@ static void BM_badd_256(benchmark::State &state) {
     for (auto _ : state) {
         bnn::add_inplace(a, b);
     }
+    cudaFree(a_data);
+    cudaFree(b_data);
 }
 
 static void BM_badd_1024(benchmark::State &state) {
@@ -425,15 +440,20 @@ static void BM_badd_1024(benchmark::State &state) {
     for (auto _ : state) {
         bnn::add_inplace(a, b);
     }
+    cudaFree(a_data);
+    cudaFree(b_data);
 }
 #undef SETUP_BADD
 
 #define SETUP_BAFFINE(n, w, h, c)                       \
     const size_t LENGTH = n * w * h * c;                \
                                                         \
-    uint64_t a_data[LENGTH];                            \
-    uint64_t x_data[LENGTH];                            \
-    uint64_t b_data[LENGTH];                            \
+    uint64_t *a_data;                                   \
+    uint64_t *x_data;                                   \
+    uint64_t *b_data;                                   \
+    cudaMallocManaged((void **)&a_data, LENGTH);        \
+    cudaMallocManaged((void **)&x_data, LENGTH);        \
+    cudaMallocManaged((void **)&b_data, LENGTH);        \
     FORZ(i, LENGTH) { a_data[i] = 13; }                 \
     FORZ(i, LENGTH) { x_data[i] = 7; }                  \
     FORZ(i, LENGTH) { b_data[i] = 5; }                  \
@@ -457,6 +477,9 @@ static void BM_baffine_debug(benchmark::State &state) {
         std::cout << "Vector A:" << std::endl;
         a.display();
     }
+    cudaFree(a_data);
+    cudaFree(x_data);
+    cudaFree(b_data);
 }
 
 static void BM_baffine_256(benchmark::State &state) {
@@ -464,6 +487,9 @@ static void BM_baffine_256(benchmark::State &state) {
     for (auto _ : state) {
         bnn::affine_inplace(a, x, b);
     }
+    cudaFree(a_data);
+    cudaFree(x_data);
+    cudaFree(b_data);
 }
 
 static void BM_baffine_1024(benchmark::State &state) {
@@ -471,6 +497,9 @@ static void BM_baffine_1024(benchmark::State &state) {
     for (auto _ : state) {
         bnn::affine_inplace(a, x, b);
     }
+    cudaFree(a_data);
+    cudaFree(x_data);
+    cudaFree(b_data);
 }
 #undef SETUP_BAFFINE
 
@@ -479,13 +508,12 @@ static void BM_baffine_1024(benchmark::State &state) {
     const size_t PHEIGHT = p;                             \
     const size_t LENGTH = n * w * h * c;                  \
                                                           \
-    float a_data[LENGTH];                                 \
-    float b_data[LENGTH];                                 \
+    float *a_data;                                        \
+    cudaMallocManaged((void **)&a_data, LENGTH);          \
     FORZ(i, LENGTH) { a_data[i] = i * i; }                \
-    FORZ(i, LENGTH) { b_data[i] = 0; }                    \
                                                           \
     bnn::Mat a(n, w, h, c, a_data, bnn::DataType::Float); \
-    bnn::Mat b(n, w, h, c, b_data, bnn::DataType::Float);
+    bnn::Mat b(n, w, h, c, bnn::DataType::Float);
 
 static void BM_bavepool_debug(benchmark::State &state) {
     SETUP_BAVEPOOL(1, 8, 8, 1, 3);
@@ -498,6 +526,7 @@ static void BM_bavepool_debug(benchmark::State &state) {
         std::cout << "Vector B:" << std::endl;
         b.display();
     }
+    cudaFree(a_data);
 }
 
 static void BM_bavepool_256(benchmark::State &state) {
@@ -505,6 +534,7 @@ static void BM_bavepool_256(benchmark::State &state) {
     for (auto _ : state) {
         bnn::ave_pool_fallback(a, 1, 1, 1, 1, PWIDTH, PHEIGHT, b);
     }
+    cudaFree(a_data);
 }
 
 static void BM_bavepool_512(benchmark::State &state) {
@@ -512,19 +542,19 @@ static void BM_bavepool_512(benchmark::State &state) {
     for (auto _ : state) {
         bnn::ave_pool_fallback(a, 1, 1, 1, 1, PWIDTH, PHEIGHT, b);
     }
+    cudaFree(a_data);
 }
 #undef SETUP_BAVEPOOL
 
-#define SETUP_BINARIZE(n, w, h, c)                           \
-    const size_t LENGTH = n * w * h * c;               \
-                                                             \
-    float a_data[LENGTH];                                   \
-    uint64_t b_data[LENGTH];                                \
-    FORZ(i, LENGTH) { a_data[i] = 1; }                  \
-    FORZ(i, LENGTH) { b_data[i] = 0; }                      \
-                                                             \
+#define SETUP_BINARIZE(n, w, h, c)                        \
+    const size_t LENGTH = n * w * h * c;                  \
+                                                          \
+    float *a_data;                                        \
+    cudaMallocManaged((void **)&a_data, LENGTH);          \
+    FORZ(i, LENGTH) { a_data[i] = 1; }                    \
+                                                          \
     bnn::Mat a(n, w, h, c, a_data, bnn::DataType::Float); \
-    bnn::Mat b(n, w, h, c, b_data, bnn::DataType::Bit);
+    bnn::Mat b(n, w, h, c, bnn::DataType::Bit);
 
 static void BM_binarize_debug(benchmark::State &state) {
     SETUP_BINARIZE(1, 4, 4, 64);
@@ -537,6 +567,7 @@ static void BM_binarize_debug(benchmark::State &state) {
         std::cout << "Vector B:" << std::endl;
         b.display();
     }
+    cudaFree(a_data);
 }
 
 static void BM_binarize_256(benchmark::State &state) {
@@ -544,6 +575,7 @@ static void BM_binarize_256(benchmark::State &state) {
     for (auto _ : state) {
         bnn::pack_mat(a, b);
     }
+    cudaFree(a_data);
 }
 
 static void BM_binarize_1024(benchmark::State &state) {
@@ -551,6 +583,7 @@ static void BM_binarize_1024(benchmark::State &state) {
     for (auto _ : state) {
         bnn::pack_mat(a, b);
     }
+    cudaFree(a_data);
 }
 #undef SETUP_BINARIZE
 
@@ -559,13 +592,12 @@ static void BM_binarize_1024(benchmark::State &state) {
     const size_t PHEIGHT = p;                             \
     const size_t LENGTH = n * w * h * c;                  \
                                                           \
-    float a_data[LENGTH];                                 \
-    float b_data[LENGTH];                                 \
+    float *a_data;                                        \
+    cudaMallocManaged((void **)&a_data, LENGTH);          \
     FORZ(i, LENGTH) { a_data[i] = i * i; }                \
-    FORZ(i, LENGTH) { b_data[i] = 0; }                    \
                                                           \
     bnn::Mat a(n, w, h, c, a_data, bnn::DataType::Float); \
-    bnn::Mat b(n, w, h, c, b_data, bnn::DataType::Float);
+    bnn::Mat b(n, w, h, c, bnn::DataType::Float);
 
 static void BM_bmaxpool_debug(benchmark::State &state) {
     SETUP_BMAXPOOL(1, 8, 8, 1, 3);
@@ -578,6 +610,7 @@ static void BM_bmaxpool_debug(benchmark::State &state) {
         std::cout << "Vector B:" << std::endl;
         b.display();
     }
+    cudaFree(a_data);
 }
 
 static void BM_bmaxpool_256(benchmark::State &state) {
@@ -585,6 +618,7 @@ static void BM_bmaxpool_256(benchmark::State &state) {
     for (auto _ : state) {
         bnn::max_pool_fallback(a, 1, 1, 1, 1, PWIDTH, PHEIGHT, b);
     }
+    cudaFree(a_data);
 }
 
 static void BM_bmaxpool_512(benchmark::State &state) {
@@ -592,22 +626,21 @@ static void BM_bmaxpool_512(benchmark::State &state) {
     for (auto _ : state) {
         bnn::max_pool_fallback(a, 1, 1, 1, 1, PWIDTH, PHEIGHT, b);
     }
+    cudaFree(a_data);
 }
 #undef SETUP_BMAXPOOL
 
-#define SETUP_BPAD(n, w, h, c, p)                     \
-    const size_t PWIDTH = p;                              \
-    const size_t PHEIGHT = p;                             \
-    const size_t ALENGTH = n * w * h * c;                  \
-    const size_t BLENGTH = n * (w+p) * (h+p) * c;         \
-                                                          \
-    uint64_t a_data[ALENGTH];                                 \
-    uint64_t b_data[BLENGTH];                                 \
-    FORZ(i, ALENGTH) { a_data[i] = 1; }                \
-    FORZ(i, BLENGTH) { b_data[i] = 1; }                    \
-                                                          \
+#define SETUP_BPAD(n, w, h, c, p)                       \
+    const size_t PWIDTH = p;                            \
+    const size_t PHEIGHT = p;                           \
+    const size_t LENGTH = n * w * h * c;                \
+                                                        \
+    uint64_t* a_data;                                   \
+    cudaMallocManaged((void **)&a_data, LENGTH);        \
+    FORZ(i, LENGTH) { a_data[i] = 1; }                  \
+                                                        \
     bnn::Mat a(n, w, h, c, a_data, bnn::DataType::Bit); \
-    bnn::Mat b(n, w+p, h+p, c, b_data, bnn::DataType::Bit);
+    bnn::Mat b(n, w + p, h + p, c, bnn::DataType::Bit);
 
 static void BM_bpad_debug(benchmark::State &state) {
     SETUP_BPAD(1, 4, 4, 64, 4);
@@ -620,6 +653,7 @@ static void BM_bpad_debug(benchmark::State &state) {
         std::cout << "Vector B:" << std::endl;
         b.display();
     }
+    cudaFree(a_data);
 }
 
 static void BM_bpad_16(benchmark::State &state) {
@@ -627,6 +661,7 @@ static void BM_bpad_16(benchmark::State &state) {
     for (auto _ : state) {
         bnn::pad(a, PWIDTH, PHEIGHT, b, 0.f);
     }
+    cudaFree(a_data);
 }
 
 static void BM_bpad_32(benchmark::State &state) {
@@ -634,6 +669,7 @@ static void BM_bpad_32(benchmark::State &state) {
     for (auto _ : state) {
         bnn::pad(a, PWIDTH, PHEIGHT, b, 0.f);
     }
+    cudaFree(a_data);
 }
 #undef SETUP_BPAD
 
