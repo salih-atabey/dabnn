@@ -11,6 +11,10 @@
 #include <cuda_runtime.h>
 #include <thrust/host_vector.h>
 #include <thrust/device_vector.h>
+#include <thrust/transform.h>
+#include <thrust/functional.h>
+#include <thrust/execution_policy.h>
+#include <common/cyclic_iterator.h>
 
 namespace bnn {
 

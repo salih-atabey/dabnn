@@ -12,12 +12,13 @@
 #include <dabnn/bitpack.h>
 #include <dabnn/mat.h>
 #include <dabnn/net.h>
-#include <dabnn/layers/Add.cpp>
-#include <dabnn/layers/Affine.cpp>
+#include <dabnn/layers/Add.cu>
+#include <dabnn/layers/Affine.cu>
 #include <dabnn/layers/AvePool.cpp>
 #include <dabnn/layers/MaxPool.cpp>
 #include <dabnn/layers/Pad.cpp>
 #include <dabnn/layers/MaxPool.h>
+#include <common/cyclic_iterator.h>
 
 static void BM_pack_mat_64_small(benchmark::State &state) {
     const bnn::Mat a(1, 32, 32, 128, bnn::DataType::Float, false);
@@ -412,7 +413,7 @@ static void BM_bireal18_imagenet_wo_fconv(benchmark::State &state) {
     bnn::Mat b(n, w, h, c, b_data, bnn::DataType::Bit);
 
 static void BM_badd_debug(benchmark::State &state) {
-    SETUP_BADD(2, 4, 4, 256);
+    SETUP_BADD(2, 4, 4, 64);
     for (auto _ : state) {
         std::cout << "--- Debug Add ---" << std::endl;
         std::cout << "a.n: " << a.n << std::endl;
@@ -431,13 +432,12 @@ static void BM_badd_debug(benchmark::State &state) {
                   << std::endl;
         std::cout << "b.diff: " << b.end<uint64_t>() - b.begin<uint64_t>()
                   << std::endl;
-
         std::cout << "Vector A:" << std::endl;
         a.display();
         std::cout << "Vector B:" << std::endl;
         b.display();
         std::cout << "Add vectors A and B..." << std::endl;
-        bnn::add_inplace(a, b);
+        add_inplace(a, b);
         std::cout << "Vector A:" << std::endl;
         a.display();
     }
@@ -448,7 +448,7 @@ static void BM_badd_debug(benchmark::State &state) {
 static void BM_badd_256(benchmark::State &state) {
     SETUP_BADD(1, 1, 256, 64);
     for (auto _ : state) {
-        bnn::add_inplace(a, b);
+        add_inplace(a, b);
     }
     cudaFree(a_data);
     cudaFree(b_data);
@@ -457,34 +457,46 @@ static void BM_badd_256(benchmark::State &state) {
 static void BM_badd_1024(benchmark::State &state) {
     SETUP_BADD(1, 1, 1024, 64);
     for (auto _ : state) {
-        bnn::add_inplace(a, b);
+        add_inplace(a, b);
     }
     cudaFree(a_data);
     cudaFree(b_data);
 }
 #undef SETUP_BADD
 
-#define SETUP_BAFFINE(n, w, h, c)                                        \
-    const size_t LENGTH = n * w * h * c;                                 \
-                                                                         \
-    uint64_t *a_data;                                                    \
-    uint64_t *x_data;                                                    \
-    uint64_t *b_data;                                                    \
+#define SETUP_BAFFINE(n, w, h, c)                                    \
+    const size_t LENGTH = n * w * h * c;                             \
+                                                                     \
+    uint64_t *a_data;                                                   \
+    uint64_t *x_data;                                                   \
+    uint64_t *b_data;                                                   \
     cudaMallocManaged((void **)&a_data, LENGTH * sizeof(uint64_t) / 64); \
     cudaMallocManaged((void **)&x_data, LENGTH * sizeof(uint64_t) / 64); \
     cudaMallocManaged((void **)&b_data, LENGTH * sizeof(uint64_t) / 64); \
-    FORZ(i, LENGTH) { a_data[i] = 13; }                                  \
-    FORZ(i, LENGTH) { x_data[i] = 7; }                                   \
-    FORZ(i, LENGTH) { b_data[i] = 5; }                                   \
-                                                                         \
-    bnn::Mat a(n, w, h, c, a_data, bnn::DataType::Bit);                  \
-    bnn::Mat x(n, w, h, c, x_data, bnn::DataType::Bit);                  \
+    FORZ(i, LENGTH) { a_data[i] = 13; }                              \
+    FORZ(i, LENGTH) { x_data[i] = 7; }                               \
+    FORZ(i, LENGTH) { b_data[i] = 5; }                               \
+                                                                     \
+    bnn::Mat a(n, w, h, c, a_data, bnn::DataType::Bit);            \
+    bnn::Mat x(n, w, h, c, x_data, bnn::DataType::Bit);            \
     bnn::Mat b(n, w, h, c, b_data, bnn::DataType::Bit);
 
 static void BM_baffine_debug(benchmark::State &state) {
-    SETUP_BAFFINE(1, 4, 4, 64);
+    SETUP_BAFFINE(1, 4, 4, 1);
     for (auto _ : state) {
         std::cout << "--- Debug Affine ---" << std::endl;
+        std::cout << "a.ptr: " << a.data << std::endl;
+        std::cout << "b.ptr: " << b.data << std::endl;
+        std::cout << "a.begin(): " << a.begin<uint64_t>() << std::endl;
+        std::cout << "b.begin(): " << b.begin<uint64_t>() << std::endl;
+        std::cout << "a.end(): " << a.end<uint64_t>() << std::endl;
+        std::cout << "b.end(): " << b.end<uint64_t>() << std::endl;
+        std::cout << "a.total(): " << a.total() << std::endl;
+        std::cout << "b.total(): " << b.total() << std::endl;
+        std::cout << "a.diff: " << a.end<uint64_t>() - a.begin<uint64_t>()
+                  << std::endl;
+        std::cout << "b.diff: " << b.end<uint64_t>() - b.begin<uint64_t>()
+                  << std::endl;
         std::cout << "Vector A:" << std::endl;
         a.display();
         std::cout << "Vector X:" << std::endl;
@@ -719,7 +731,7 @@ BENCHMARK_MAIN();
 // BENCHMARK(BM_bireal18_imagenet_stem);
 // BENCHMARK(BM_bnn_bconv_3x3_naive_128);
 // BENCHMARK(BM_bconv_float_1x1_128);
-// BENCHMARK(BM_bconv_float_3x3_128);
+// BENCHMARK(BM_bconv_float_3x3_128);/*
 
 // BIREAL
 BENCHMARK(BM_bireal18_imagenet);
@@ -731,8 +743,8 @@ BENCHMARK(BM_badd_1024);
 // BENCHMARK(BM_badd_debug)->Iterations(1);
 
 // AFFINE
-BENCHMARK(BM_baffine_256);
-BENCHMARK(BM_baffine_1024);
+// BENCHMARK(BM_baffine_256);
+// BENCHMARK(BM_baffine_1024);
 // BENCHMARK(BM_baffine_debug)->Iterations(1);
 
 // AVEPOLL

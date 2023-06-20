@@ -15,11 +15,11 @@ CUDA_ADD_LIBRARY(dabnn SHARED
     layers/BinConv.h
     layers/MaxPool.cpp
     layers/MaxPool.h
-    layers/Affine.cpp
+    layers/Affine.cu
     layers/Affine.h
     layers/AvePool.cpp
     layers/AvePool.h
-    layers/Add.cpp
+    layers/Add.cu
     layers/Add.h
     layers/Concat.cpp
     layers/Concat.h
@@ -68,3 +68,5 @@ if (${BNN_CHECK_CONSISTENCY})
 endif()
 
 treat_warnings_as_errors(dabnn)
+
+set_property(TARGET dabnn PROPERTY CUDA_ARCHITECTURES OFF)

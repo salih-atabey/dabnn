@@ -1,11 +1,11 @@
 # Copyright 2019 JD.com Inc. JD AI
 
 cmake_minimum_required(VERSION 3.9)
-project(dabnn CXX)
-
-set(CMAKE_PREFIX_PATH "/usr/local/cuda/include/thrust" ${CMAKE_PREFIX_PATH})
+project(dabnn LANGUAGES CXX CUDA)
 
 find_package(CUDA REQUIRED)
+enable_language(CUDA)
+set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -std=c++17" )
 include_directories(${CUDA_INCLUDE_DIRS})
 
 message(STATUS "CMake Version: ${CMAKE_VERSION}")

@@ -1,5 +1,8 @@
 // Copyright 2019 JD.com Inc. JD AI
 
+#ifndef BNN_ADD_CPP
+#define BNN_ADD_CPP
+
 #include "Add.h"
 
 namespace bnn {
@@ -18,10 +21,10 @@ inline void add_inplace(bnn::Mat &a, bnn::Mat &b) {
         throw std::invalid_argument("Mismatch datatype");
     } else if (a.data_type == DataType::Float) {
         add_functor<float> func;
-        thrust::transform(a.begin<float>(), a.end<float>(), b.begin<float>(), a.begin<float>(), func);
-    } else if (b.data_type == DataType::Bit) {
+        thrust::transform(thrust::device, a.begin<float>(), a.end<float>(), b.begin<float>(), a.begin<float>(), func);
+    } else if (a.data_type == DataType::Bit) {
         add_functor<uint64_t> func;
-        thrust::transform(a.begin<uint64_t>(), a.end<uint64_t>(), b.begin<uint64_t>(), a.begin<uint64_t>(), func);
+        thrust::transform(thrust::device, a.begin<uint64_t>(), a.end<uint64_t>(), b.begin<uint64_t>(), a.begin<uint64_t>(), func);
     } else {
         throw std::invalid_argument("Unknown datatype");
     }
@@ -33,13 +36,14 @@ inline void add(bnn::Mat &a, bnn::Mat &b, bnn::Mat &c) {
         throw std::invalid_argument("Mismatch datatype");
     } else if (a.data_type == DataType::Float) {
         add_functor<float> func;
-        thrust::transform(a.begin<float>(), a.end<float>(), b.begin<float>(), c.begin<float>(), func);
-    } else if (b.data_type == DataType::Bit) {
+        thrust::transform(thrust::device, a.begin<float>(), a.end<float>(), b.begin<float>(), c.begin<float>(), func);
+    } else if (a.data_type == DataType::Bit) {
         add_functor<uint64_t> func;
-        thrust::transform(a.begin<uint64_t>(), a.end<uint64_t>(), b.begin<uint64_t>(), c.begin<uint64_t>(), func);
+        thrust::transform(thrust::device, a.begin<uint64_t>(), a.end<uint64_t>(), b.begin<uint64_t>(), c.begin<uint64_t>(), func);
     } else {
         throw std::invalid_argument("Unknown datatype");
     }
+    cudaDeviceSynchronize();
 }
 
 void Add::forward_impl() const {
@@ -51,3 +55,5 @@ void Add::forward_impl() const {
 }
 
 }  // namespace bnn
+
+#endif /* BNN_ADD_CPP */
