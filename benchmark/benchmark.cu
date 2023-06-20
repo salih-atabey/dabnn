@@ -15,6 +15,7 @@
 #include <dabnn/layers/Add.cu>
 #include <dabnn/layers/Affine.cu>
 #include <dabnn/layers/AvePool.cu>
+#include <dabnn/layers/Binarize.cu>
 #include <dabnn/layers/MaxPool.cu>
 #include <dabnn/layers/Pad.cpp>
 #include <dabnn/layers/MaxPool.h>
@@ -582,7 +583,7 @@ static void BM_bavepool_512(benchmark::State &state) {
                                                                  \
     float *a_data;                                               \
     cudaMallocManaged((void **)&a_data, LENGTH * sizeof(float)); \
-    FORZ(i, LENGTH) { a_data[i] = 1; }                           \
+    FORZ(i, LENGTH) { a_data[i] = i; }                           \
                                                                  \
     bnn::Mat a(n, w, h, c, a_data, bnn::DataType::Float);        \
     bnn::Mat b(n, w, h, c, bnn::DataType::Bit);
@@ -594,7 +595,7 @@ static void BM_binarize_debug(benchmark::State &state) {
         std::cout << "Vector A:" << std::endl;
         a.display();
         std::cout << "Binarize vector A..." << std::endl;
-        bnn::pack_mat(a, b);
+        bnn::binarize(a, b);
         std::cout << "Vector B:" << std::endl;
         b.display();
     }
@@ -604,7 +605,7 @@ static void BM_binarize_debug(benchmark::State &state) {
 static void BM_binarize_256(benchmark::State &state) {
     SETUP_BINARIZE(1, 1, 256, 64);
     for (auto _ : state) {
-        bnn::pack_mat(a, b);
+        bnn::binarize(a, b);
     }
     cudaFree(a_data);
 }
@@ -612,7 +613,7 @@ static void BM_binarize_256(benchmark::State &state) {
 static void BM_binarize_1024(benchmark::State &state) {
     SETUP_BINARIZE(1, 1, 1024, 64);
     for (auto _ : state) {
-        bnn::pack_mat(a, b);
+        bnn::binarize(a, b);
     }
     cudaFree(a_data);
 }

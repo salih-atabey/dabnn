@@ -25,7 +25,7 @@ CUDA_ADD_LIBRARY(dabnn SHARED
     layers/Concat.h
     layers/Relu.cpp
     layers/Relu.h
-    layers/Binarize.cpp
+    layers/Binarize.cu
     layers/Binarize.h
     layers/Shuffle.cpp
     layers/Shuffle.h
