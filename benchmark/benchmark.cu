@@ -15,7 +15,7 @@
 #include <dabnn/layers/Add.cu>
 #include <dabnn/layers/Affine.cu>
 #include <dabnn/layers/AvePool.cu>
-#include <dabnn/layers/MaxPool.cpp>
+#include <dabnn/layers/MaxPool.cu>
 #include <dabnn/layers/Pad.cpp>
 #include <dabnn/layers/MaxPool.h>
 #include <common/cyclic_iterator.h>

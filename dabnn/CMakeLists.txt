@@ -13,7 +13,7 @@ CUDA_ADD_LIBRARY(dabnn SHARED
     layers/FloatConv.h
     layers/BinConv.cpp
     layers/BinConv.h
-    layers/MaxPool.cpp
+    layers/MaxPool.cu
     layers/MaxPool.h
     layers/Affine.cu
     layers/Affine.h
