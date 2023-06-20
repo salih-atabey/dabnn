@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <limits>
 #include "mat.h"
 #include <cuda.h>
 #include <cuda_runtime.h>
