@@ -280,6 +280,7 @@ void max_pool_fallback(const bnn::Mat &input, const size_t pad_h,
     } else {
         throw std::invalid_argument("Unknown datatype");
     }
+    cudaDeviceSynchronize();
 }
 
 MaxPool::MaxPool(NetCP net, const std::string &name, css input, css output,

@@ -187,7 +187,8 @@ void BinConv::forward_impl() const {
         case Method::DIRECT_CONV: {
             pack_mat(*input_mat, *binarized_mat);
             pad(*binarized_mat, pad_h, pad_w, *padded_mat);
-            bconv_3x3(*padded_mat, *weight_mat, *output_mat, stride_h);
+            // bconv_3x3(*padded_mat, *weight_mat, *output_mat, stride_h);
+            baseline_bconv(*padded_mat, *weight_mat, 3, 3, 0, 0, stride_h, stride_h, 1, 1, output_mat->c, *output_mat);
             break;
         }
         case Method::BGEMM: {
@@ -229,6 +230,7 @@ void BinConv::forward_impl() const {
             break;
         }
     }
+    cudaDeviceSynchronize();
 }
 
 std::string BinConv::to_str() const {

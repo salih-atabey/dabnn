@@ -159,6 +159,7 @@ void ave_pool_fallback(const bnn::Mat &input, const size_t pad_h,
     } else {
         throw std::invalid_argument("Unknown datatype");
     }
+    cudaDeviceSynchronize();
 }
 
 AvePool::AvePool(NetCP net, const std::string &name, css input, css output,

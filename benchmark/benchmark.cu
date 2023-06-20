@@ -208,7 +208,9 @@ static void BM_bnn_bconv_3x3_64(benchmark::State &state) {
 static void BM_bnn_bconv_3x3_128(benchmark::State &state) {
     SETUP_BCONV(30, 3, 128, 1);
     for (auto _ : state) {
-        bnn::bconv_3x3(a, b, c);
+        // bnn::bconv_3x3(a, b, c);
+        // baseline_bconv(a, b, 3, 3, 0, 0, stride_h, stride_w, 1, 1, NUM_OUTPUT, c);
+        baseline_bconv(a, b, 3, 3, 0, 0, 1, 1, 1, 1, NUM_OUTPUT, c);
     }
     cudaFree(a_data);
     cudaFree(b_data);
@@ -238,7 +240,9 @@ static void BM_bnn_bconv_3x3_512(benchmark::State &state) {
 static void BM_bnn_bconv_3x3_1024(benchmark::State &state) {
     SETUP_BCONV(9, 3, 1024, 1);
     for (auto _ : state) {
-        bnn::bconv_3x3(a, b, c);
+        // bnn::bconv_3x3(a, b, c);
+        // baseline_bconv(a, b, 3, 3, 0, 0, stride_h, stride_w, 1, 1, NUM_OUTPUT, c);
+        baseline_bconv(a, b, 3, 3, 0, 0, 1, 1, 1, 1, NUM_OUTPUT, c);
     }
     cudaFree(a_data);
     cudaFree(b_data);
@@ -362,7 +366,7 @@ static void BM_bireal18_imagenet(benchmark::State &state) {
     }
     cudaDeviceSynchronize();
     cudaFree(input);
-    net->~Net();
+    // net->~Net();
 }
 
 static void BM_bireal18_imagenet_stem(benchmark::State &state) {
@@ -377,7 +381,7 @@ static void BM_bireal18_imagenet_stem(benchmark::State &state) {
     }
     cudaDeviceSynchronize();
     cudaFree(input);
-    net->~Net();
+    // net->~Net();
 }
 
 static void BM_bireal18_cifar_wo_fconv(benchmark::State &state) {
