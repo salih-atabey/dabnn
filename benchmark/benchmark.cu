@@ -16,6 +16,7 @@
 #include <dabnn/layers/Affine.cu>
 #include <dabnn/layers/AvePool.cu>
 #include <dabnn/layers/Binarize.cu>
+#include <dabnn/layers/BinConv.cu>
 #include <dabnn/layers/MaxPool.cu>
 #include <dabnn/layers/Pad.cpp>
 #include <dabnn/layers/MaxPool.h>
@@ -155,7 +156,7 @@ static void BM_bnn_bconv_debug(benchmark::State &state) {
 static void BM_bnn_bconv_3x3_naive_128(benchmark::State &state) {
     SETUP_BCONV(30, 3, 128, 1);
     for (auto _ : state) {
-        bnn::baseline_bconv(a, b, BHEIGHT, BWIDTH, 0, 0, 1, 1, 1, 1, NUM_OUTPUT,
+        bnn::binconv(a, b, BHEIGHT, BWIDTH, 0, 0, 1, 1, 1, 1, NUM_OUTPUT,
                             c);
     }
 }
@@ -163,7 +164,7 @@ static void BM_bnn_bconv_3x3_naive_128(benchmark::State &state) {
 static void BM_bnn_bconv_1x1_naive_128(benchmark::State &state) {
     SETUP_BCONV(28, 1, 128, 1);
     for (auto _ : state) {
-        bnn::baseline_bconv(a, b, BHEIGHT, BWIDTH, 0, 0, 1, 1, 1, 1, NUM_OUTPUT,
+        bnn::binconv(a, b, BHEIGHT, BWIDTH, 0, 0, 1, 1, 1, 1, NUM_OUTPUT,
                             c);
     }
 }
@@ -210,7 +211,7 @@ static void BM_bnn_bconv_3x3_128(benchmark::State &state) {
     for (auto _ : state) {
         // bnn::bconv_3x3(a, b, c);
         // baseline_bconv(a, b, 3, 3, 0, 0, stride_h, stride_w, 1, 1, NUM_OUTPUT, c);
-        baseline_bconv(a, b, 3, 3, 0, 0, 1, 1, 1, 1, NUM_OUTPUT, c);
+        binconv(a, b, 3, 3, 0, 0, 1, 1, 1, 1, NUM_OUTPUT, c);
     }
     cudaFree(a_data);
     cudaFree(b_data);
@@ -242,7 +243,7 @@ static void BM_bnn_bconv_3x3_1024(benchmark::State &state) {
     for (auto _ : state) {
         // bnn::bconv_3x3(a, b, c);
         // baseline_bconv(a, b, 3, 3, 0, 0, stride_h, stride_w, 1, 1, NUM_OUTPUT, c);
-        baseline_bconv(a, b, 3, 3, 0, 0, 1, 1, 1, 1, NUM_OUTPUT, c);
+        binconv(a, b, 3, 3, 0, 0, 1, 1, 1, 1, NUM_OUTPUT, c);
     }
     cudaFree(a_data);
     cudaFree(b_data);
@@ -251,7 +252,7 @@ static void BM_bnn_bconv_3x3_1024(benchmark::State &state) {
 static void BM_bnn_bconv(benchmark::State &state) {
     SETUP_BCONV(30, 3, 128, 1);
     for (auto _ : state) {
-        bnn::baseline_bconv(a, b, BHEIGHT, BWIDTH, 0, 0, 1, 1, 1, 1, NUM_OUTPUT,
+        bnn::binconv(a, b, BHEIGHT, BWIDTH, 0, 0, 1, 1, 1, 1, NUM_OUTPUT,
                             c);
     }
 }

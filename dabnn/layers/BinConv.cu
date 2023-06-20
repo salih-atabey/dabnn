@@ -9,6 +9,7 @@
 #include <dabnn/fused_binarize_im2col.h>
 #include <dabnn/net.h>
 #include <dabnn/pad.h>
+#include <thrust/iterator/counting_iterator.h>
 
 namespace bnn {
 
@@ -141,6 +142,83 @@ bool BinConv::gemm_compatible() const {
 #endif
 }
 
+struct binconv_functor
+{
+    const int kernel_h, kernel_w, pad_h, pad_w, stride_h, stride_w, dilation_h, dilation_w, output_channels;
+    const int HWC;
+    const int input_h, input_w, input_c;
+    const uint64_t* weight;
+    const uint64_t* input;
+
+    binconv_functor(const int kernel_h, const int kernel_w, const int pad_h, const int pad_w,
+                    const int stride_h, const int stride_w, const int dilation_h, const int dilation_w,
+                    const int output_channels, const int HWC, const int input_h, const int input_w, const int input_c,
+                    uint64_t* weight, uint64_t* input)
+        : kernel_h(kernel_h), kernel_w(kernel_w), pad_h(pad_h), pad_w(pad_w),
+          stride_h(stride_h), stride_w(stride_w), dilation_h(dilation_h), dilation_w(dilation_w),
+          output_channels(output_channels), HWC(HWC), input_h(input_h), input_w(input_w), input_c(input_c),
+          weight(weight), input(input)
+    {}
+
+    __device__
+    float operator()(const thrust::tuple<int, int, int>& indices) const
+    {
+        uint32_t acc = 0;
+        const int th = thrust::get<0>(indices);
+        const int tw = thrust::get<1>(indices);
+        const int tc = thrust::get<2>(indices);
+
+        for (int wh = 0; wh < kernel_h; ++wh)
+        {
+            int y = th * stride_h - pad_h + wh * dilation_h;
+            for (int ww = 0; ww < kernel_w; ++ww)
+            {
+                int x = tw * stride_w - pad_w + ww * dilation_w;
+                for (int wc = 0; wc < input_c; ++wc)
+                {
+                    int idx = tc * HWC + wh * kernel_w * input_c + ww * input_c + wc;
+                    const auto w_value = weight[idx];
+                    bool out = y < 0 || y >= input_h || x < 0 || x >= input_w;
+                    const auto bottom_value = out ? 0 : input[y * input_w * input_c + x * input_c + wc];
+                    uint8_t tmp = __popcll(w_value ^ bottom_value);
+                    acc += tmp;
+                }
+            }
+        }
+        return static_cast<float>(acc);
+    }
+};
+
+inline void binconv(const Mat& input, const Mat& weight,
+                    const int kernel_h, const int kernel_w,
+                    const int pad_h, const int pad_w, const int stride_h,
+                    const int stride_w, const int dilation_h,
+                    const int dilation_w, const int output_channels,
+                    Mat& output)
+{
+    BNN_ASSERT(weight.total() % weight.n == 0, "");
+    const auto HWC = weight.total() / weight.n;
+    const int input_h = input.h;
+    const int input_w = input.w;
+    const int input_c = input.c;
+
+    thrust::counting_iterator<int> th_iter(0);
+    thrust::counting_iterator<int> tw_iter(0);
+    thrust::counting_iterator<int> tc_iter(0);
+
+    binconv_functor func(kernel_h, kernel_w, pad_h, pad_w, stride_h, stride_w, dilation_h, dilation_w,
+                         output_channels, HWC, input_h, input_w, input_c,
+                         (uint64_t*)weight.data, (uint64_t*)input.data);
+
+    thrust::transform(thrust::device,
+        thrust::make_zip_iterator(thrust::make_tuple(th_iter, tw_iter, tc_iter)),
+        thrust::make_zip_iterator(thrust::make_tuple(th_iter + output.h, tw_iter + output.w, tc_iter + output_channels)),
+        output.begin<float>(),
+        func
+    );
+}
+
+/*
 inline void binconv(const Mat &input, const Mat &weight,
                         const int kernel_h, const int kernel_w,
                         const int pad_h, const int pad_w, const int stride_h,
@@ -181,6 +259,7 @@ inline void binconv(const Mat &input, const Mat &weight,
         input_y += stride_h;
     }
 }
+*/
 
 void BinConv::forward_impl() const {
     switch (method()) {
@@ -188,7 +267,7 @@ void BinConv::forward_impl() const {
             pack_mat(*input_mat, *binarized_mat);
             pad(*binarized_mat, pad_h, pad_w, *padded_mat);
             // bconv_3x3(*padded_mat, *weight_mat, *output_mat, stride_h);
-            baseline_bconv(*padded_mat, *weight_mat, 3, 3, 0, 0, stride_h, stride_h, 1, 1, output_mat->c, *output_mat);
+            binconv(*padded_mat, *weight_mat, 3, 3, 0, 0, stride_h, stride_h, 1, 1, output_mat->c, *output_mat);
             break;
         }
         case Method::BGEMM: {
@@ -224,7 +303,7 @@ void BinConv::forward_impl() const {
         }
         case Method::BCONV_NAIVE: {
             pack_mat(*input_mat, *binarized_mat);
-            baseline_bconv(*binarized_mat, *weight_mat, weight_mat->h,
+            binconv(*binarized_mat, *weight_mat, weight_mat->h,
                            weight_mat->w, pad_h, pad_w, stride_h, stride_w, 1,
                            1, output_mat->c, *output_mat);
             break;

@@ -26,7 +26,7 @@ inline void affine_inplace(bnn::Mat &data, bnn::Mat &a,
         auto zip_end = thrust::make_zip_iterator(thrust::make_tuple(a.end<float>(), b.end<float>()));
         auto zip_cyc_begin = cyclic_iterator<thrust::zip_iterator<thrust::tuple<float*, float*>>>(zip_begin, a.total());
         auto zip_cyc_end = cyclic_iterator<thrust::zip_iterator<thrust::tuple<float*, float*>>>(zip_end, a.total());
-        thrust::transform(thrust::host, data.begin<float>(), data.end<float>(), zip_cyc_begin, data.begin<float>(), func); // _TODO: Move this function into device after net impl
+        thrust::transform(thrust::device, data.begin<float>(), data.end<float>(), zip_cyc_begin, data.begin<float>(), func);
     } else if (b.data_type == DataType::Bit) {
         affine_functor<uint64_t> func;
         auto zip_begin = thrust::make_zip_iterator(thrust::make_tuple(a.begin<uint64_t>(), b.begin<uint64_t>()));
