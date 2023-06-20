@@ -17,7 +17,7 @@ CUDA_ADD_LIBRARY(dabnn SHARED
     layers/MaxPool.h
     layers/Affine.cu
     layers/Affine.h
-    layers/AvePool.cpp
+    layers/AvePool.cu
     layers/AvePool.h
     layers/Add.cu
     layers/Add.h

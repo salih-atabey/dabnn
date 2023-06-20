@@ -14,7 +14,7 @@
 #include <dabnn/net.h>
 #include <dabnn/layers/Add.cu>
 #include <dabnn/layers/Affine.cu>
-#include <dabnn/layers/AvePool.cpp>
+#include <dabnn/layers/AvePool.cu>
 #include <dabnn/layers/MaxPool.cpp>
 #include <dabnn/layers/Pad.cpp>
 #include <dabnn/layers/MaxPool.h>
@@ -743,8 +743,8 @@ BENCHMARK(BM_badd_1024);
 // BENCHMARK(BM_badd_debug)->Iterations(1);
 
 // AFFINE
-// BENCHMARK(BM_baffine_256);
-// BENCHMARK(BM_baffine_1024);
+BENCHMARK(BM_baffine_256);
+BENCHMARK(BM_baffine_1024);
 // BENCHMARK(BM_baffine_debug)->Iterations(1);
 
 // AVEPOLL

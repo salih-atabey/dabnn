@@ -7,6 +7,52 @@
 
 namespace bnn {
 
+template<typename T>
+struct avepool_functor {
+    const T* input;
+    const size_t pad_h, pad_w, stride_h, stride_w, kernel_h, kernel_w, output_w, input_hstep;
+    const int input_h, input_w, input_c;
+
+    avepool_functor(const T* _input, const size_t _pad_h, const size_t _pad_w,
+           const size_t _stride_h, const size_t _stride_w, const size_t _kernel_h,
+           const size_t _kernel_w, const int _output_w, const int _input_h,
+           const int _input_w, const int _input_c, const size_t _input_hstep)
+        : input(_input), pad_h(_pad_h), pad_w(_pad_w), stride_h(_stride_h),
+          stride_w(_stride_w), kernel_h(_kernel_h), kernel_w(_kernel_w),
+          output_w(_output_w), input_h(_input_h), input_w(_input_w), input_c(_input_c), input_hstep(_input_hstep) {}
+
+    __host__ __device__
+    T operator()(const int output_idx) const {
+        const int output_y = output_idx / output_w;
+        const int output_x = output_idx % output_w;
+
+        int input_y = output_y * stride_h - pad_h;
+        int input_x = output_x * stride_w - pad_w;
+
+        size_t n = 0;
+        T sum = 0;
+
+        for (int kh = 0; kh < kernel_h; kh++) {
+            int y = input_y + kh;
+            if (y >= 0 && y < input_h) {
+                // const T* input_ptr = input.point<T>(y, 0);
+                const T* input_ptr = input + y * input_hstep;
+                for (int kw = 0; kw < kernel_w; kw++) {
+                    int x = input_x + kw;
+                    if (x >= 0 && x < input_w) {
+                        const auto val = input_ptr[x * input_c];
+                        sum += val;
+                        n++;
+                    }
+                }
+            }
+        }
+
+        return sum / n;
+    }
+};
+
+
 #ifdef __ARM_NEON
 void ave_pool_2x2_s2(const bnn::Mat &input, bnn::Mat &output) {
     FORZ(h, output.h) {
@@ -94,64 +140,22 @@ void ave_pool_fallback(const bnn::Mat &input, const size_t pad_h,
     BNN_ASSERT(output.w * output.c * output.elemsize % 16 == 0, "Not align");
     BNN_ASSERT(input.data_type == input.data_type, "Mismatch datatype");
 
-    int input_y = 0;
+    const int input_h = input.h;
+    const int input_w = input.w;
+    const int input_c = input.c;
+    const size_t input_hstep = input.hstep;
+
+    thrust::counting_iterator<int> idx_begin(0);
+    thrust::counting_iterator<int> idx_end = idx_begin + output_h * output_w;
 
     if (input.data_type == DataType::Float) {
-        FORZ(output_y, output_h) {
-            int input_x = 0;
-            FORZ(output_x, output_w) {
-                FORZ(output_c, input.c) {
-                    size_t n = 0;
-                    float sum = 0;
-                    FORZ(kh, kernel_h) {
-                        int y = input_y - pad_h + kh;
-                        const auto *input_ptr = input.point<float>(y, 0);
-                        FORZ(kw, kernel_w) {
-                            int x = input_x - pad_w + kw;
-                            if (!(y < 0 || y >= input.h || x < 0 ||
-                                  x >= input.w)) {
-                                const auto val =
-                                    input_ptr[x * input.c + output_c];
-                                sum += val;
-                                n++;
-                            }
-                        }
-                    }
-                    output[output_y * output_w * input.c + output_x * input.c +
-                           output_c] = sum / n;
-                }
-                input_x += stride_w;
-            }
-            input_y += stride_h;
-        }
+        avepool_functor<float> func(input, pad_h, pad_w, stride_h, stride_w, kernel_h, kernel_w, output_w, input_h, input_w, input_c, input_hstep);
+        thrust::device_vector<float> output_values(output_h * output_w * input_c);
+        thrust::transform(thrust::device, idx_begin, idx_end, output.begin<float>(), func);
     } else if (input.data_type == DataType::Bit) {
-        FORZ(output_y, output_h) {
-            int input_x = 0;
-            FORZ(output_x, output_w) {
-                FORZ(output_c, input.c) {
-                    size_t n = 0;
-                    uint64_t sum = 0;
-                    FORZ(kh, kernel_h) {
-                        int y = input_y - pad_h + kh;
-                        const auto *input_ptr = input.point<uint64_t>(y, 0);
-                        FORZ(kw, kernel_w) {
-                            int x = input_x - pad_w + kw;
-                            if (!(y < 0 || y >= input.h || x < 0 ||
-                                  x >= input.w)) {
-                                const auto val =
-                                    input_ptr[x * input.c + output_c];
-                                sum += val;
-                                n++;
-                            }
-                        }
-                    }
-                    output[output_y * output_w * input.c + output_x * input.c +
-                           output_c] = sum / n;
-                }
-                input_x += stride_w;
-            }
-            input_y += stride_h;
-        }
+        avepool_functor<uint64_t> func(input, pad_h, pad_w, stride_h, stride_w, kernel_h, kernel_w, output_w, input_h, input_w, input_c, input_hstep);
+        thrust::device_vector<uint64_t> output_values(output_h * output_w * input_c);
+        thrust::transform(thrust::device, idx_begin, idx_end, output.begin<uint64_t>(), func);
     } else {
         throw std::invalid_argument("Unknown datatype");
     }
