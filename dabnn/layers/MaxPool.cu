@@ -31,9 +31,7 @@ struct maxpool_functor {
         int input_y = output_y * stride_h - pad_h;
         int input_x = output_x * stride_w - pad_w;
 
-        const T* init_ptr = input + input_y * input_hstep;
-
-        T m = init_ptr[input_x * input_c];
+        T m = std::numeric_limits<T>::max();
         thrust::maximum<T> max;
 
         for (int kh = 0; kh < kernel_h; kh++) {
@@ -275,11 +273,9 @@ void max_pool_fallback(const bnn::Mat &input, const size_t pad_h,
     
     if (input.data_type == DataType::Float) { 
         maxpool_functor<float> func(input, pad_h, pad_w, stride_h, stride_w, kernel_h, kernel_w, output_w, input_h, input_w, input_c, input_hstep);
-        thrust::device_vector<float> output_values(output_h * output_w * input_c);
         thrust::transform(thrust::device, idx_begin, idx_end, output.begin<float>(), func);
     } else if (input.data_type == DataType::Bit) {
         maxpool_functor<uint64_t> func(input, pad_h, pad_w, stride_h, stride_w, kernel_h, kernel_w, output_w, input_h, input_w, input_c, input_hstep);
-        thrust::device_vector<uint64_t> output_values(output_h * output_w * input_c);
         thrust::transform(thrust::device, idx_begin, idx_end, output.begin<uint64_t>(), func);
     } else {
         throw std::invalid_argument("Unknown datatype");
