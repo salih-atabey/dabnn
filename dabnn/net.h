@@ -17,6 +17,7 @@
 #include <dabnn/layers/MaxPool.h>
 #include "layer.h"
 #include "mat.h"
+#include <cuda_runtime.h>
 
 namespace bnn {
 class Net : public std::enable_shared_from_this<Net> {
@@ -48,6 +49,7 @@ class Net : public std::enable_shared_from_this<Net> {
     friend class Add;
 
    public:
+    ~Net();
     void read(const std::string &path);
     void read_buf(const void *ptr);
     void prepare();
@@ -59,11 +61,15 @@ class Net : public std::enable_shared_from_this<Net> {
     bool optimize = true;
     bool run_fconv = true;
     bool strict = true;
+    friend struct make_shared_enabler; 
 
 #ifdef BNN_BENCHMARK
     void print_time();
 #endif
 };
+
+struct make_shared_enabler : public Net {};
+
 }  // namespace bnn
 
 #endif /* BNN_NET_H */

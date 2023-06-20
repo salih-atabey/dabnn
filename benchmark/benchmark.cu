@@ -360,7 +360,9 @@ static void BM_bireal18_imagenet(benchmark::State &state) {
     for (auto _ : state) {
         net->run(input);
     }
+    cudaDeviceSynchronize();
     cudaFree(input);
+    net->~Net();
 }
 
 static void BM_bireal18_imagenet_stem(benchmark::State &state) {
@@ -373,7 +375,9 @@ static void BM_bireal18_imagenet_stem(benchmark::State &state) {
     for (auto _ : state) {
         net->run(input);
     }
+    cudaDeviceSynchronize();
     cudaFree(input);
+    net->~Net();
 }
 
 static void BM_bireal18_cifar_wo_fconv(benchmark::State &state) {

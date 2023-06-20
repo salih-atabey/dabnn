@@ -6,12 +6,12 @@ CUDA_ADD_LIBRARY(dabnn SHARED
     mat.h
     bconv.h
     bitpack.h
-    net.cpp
+    net.cu
     im2col.h
     fconv.h
     layers/FloatConv.cpp
     layers/FloatConv.h
-    layers/BinConv.cpp
+    layers/BinConv.cu
     layers/BinConv.h
     layers/MaxPool.cu
     layers/MaxPool.h

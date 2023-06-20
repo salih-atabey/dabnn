@@ -141,6 +141,47 @@ bool BinConv::gemm_compatible() const {
 #endif
 }
 
+inline void binconv(const Mat &input, const Mat &weight,
+                        const int kernel_h, const int kernel_w,
+                        const int pad_h, const int pad_w, const int stride_h,
+                        const int stride_w, const int dilation_h,
+                        const int dilation_w, const int output_channels,
+                        Mat &output) {
+    BNN_ASSERT(weight.total() % weight.n == 0, "");
+    const auto HWC = weight.total() / weight.n;
+    int input_y = 0;
+    FORZ(th, output.h) {
+        int input_x = 0;
+        FORZ(tw, output.w) {
+            FORZ(tc, output_channels) {
+                uint32_t acc = 0;
+                FORZ(wh, kernel_h) {
+                    int y = input_y - pad_h + wh * dilation_h;
+                    FORZ(ww, kernel_w) {
+                        int x = input_x - pad_w + ww * dilation_w;
+                        FORZ(wc, input.c) {
+                            int idx = tc * HWC +
+                                      wh * kernel_w * input.c + ww * input.c +
+                                      wc;
+                            const auto w_value =
+                                *(static_cast<uint64_t *>(weight.data) + idx);
+                            bool out =
+                                y < 0 || y >= input.h || x < 0 || x >= input.w;
+                            const auto bottom_value =
+                                out ? 0 : *(input.point<uint64_t>(y, x) + wc);
+                            uint8_t tmp = ::bitcount(w_value ^ bottom_value);
+                            acc += tmp;
+                        }
+                    }
+                }
+                *(output.point<float>(th, tw) + tc) = static_cast<float>(acc);
+            }
+            input_x += stride_w;
+        }
+        input_y += stride_h;
+    }
+}
+
 void BinConv::forward_impl() const {
     switch (method()) {
         case Method::DIRECT_CONV: {

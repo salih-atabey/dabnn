@@ -34,7 +34,7 @@ For ARMv7, just replace `-DANDROID_ABI=arm64-v8a` with `-DANDROID_ABI=armeabi-v7
 
 For non-Android ARM devices, use the proper toolchain file for your device instead of the Android NDK toolchain file, or compile natively on your ARM device.
 
-For non-ARM devices, only the unoptimized code will work. If you still want to build dabnn for non-ARM devices, pass `-DBNN_BUILD_MAIN_LIB=ON` in step 2.
+For non-ARM devices, only the unoptimized code will work. If you still want to build dabnn for non-ARM devices, pass `-DBNN_BUILD_MAIN_LIB=ON` and `-DBNN_BENCHMARK=ON` in step 2.
 
 ### Build onnx2bnn
 

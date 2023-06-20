@@ -29,6 +29,21 @@ using std::vector;
 
 namespace bnn {
 
+Net::~Net() {
+    for (const auto& pair : mat_map_) {
+        auto mat = pair.second;
+        if (mat->data_type == DataType::Bit) {
+            if (mat->external_memory) {
+                cudaFree(mat->data);
+            }
+        } else if (mat->data_type == DataType::Float) {
+            if (mat->external_memory) {
+                cudaFree(mat->data);
+            }
+        }
+    }
+}
+
 void Net::read(const std::string &path) {
     auto fd = open(path.c_str(), O_RDONLY);
     if (fd == -1) {
@@ -74,13 +89,17 @@ void Net::prepare() {
             // This shape is the same as that of flatbuffers
             Shaper::Shape shape(tensor->shape()->begin(),
                                 tensor->shape()->end());
-            const auto *data = tensor->bin_data()->data();
 
             const auto name = tensor->name()->str();
 
             shaper.AddShape(name, shape);
 
             const auto len = tensor->bin_data()->size();
+
+            // const auto *data = tensor->bin_data()->data();
+            uint64_t *data;
+            cudaMallocManaged((void **)&data, len * sizeof(uint64_t));
+            cudaMemcpy(data, tensor->bin_data()->data(), len * sizeof(uint64_t), cudaMemcpyHostToDevice);
 #ifdef __aarch64__
             // TODO: Move it to binconv.cpp
             // 1. More correct
@@ -112,7 +131,9 @@ void Net::prepare() {
         } else if (tensor->data_type() == flatbnn::DataType::Float32) {
             Shaper::Shape shape(tensor->shape()->begin(),
                                 tensor->shape()->end());
-            const auto *data = tensor->float32_data()->Data();
+            // const auto *data = tensor->float32_data()->Data();
+            float *data;
+            
             const auto name = tensor->name()->str();
 
             shaper.AddShape(name, shape);
@@ -120,19 +141,27 @@ void Net::prepare() {
             if (shape.size() == 4) {
                 // conv weight
                 const auto len = shape[0] * shape[1] * shape[2] * shape[3];
-                auto buf = std::make_shared<std::vector<float>>(len);
-                memcpy(buf->data(), data, len * sizeof(float));
+                // auto buf = std::make_shared<std::vector<float>>(len);
+                // memcpy(buf->data(), data, len * sizeof(float));
+                cudaMallocManaged((void **)&data, len * sizeof(float));
+                cudaMemcpy(data, tensor->float32_data()->Data(), len * sizeof(float), cudaMemcpyHostToDevice);
+                // add_mat(name, std::make_shared<Mat>(
+                //                   shape[0], shape[1], shape[2], shape[3],
+                //                   const_cast<uint8_t *>(data),
+                //                   bnn::DataType::Float, false));
                 add_mat(name, std::make_shared<Mat>(
                                   shape[0], shape[1], shape[2], shape[3],
-                                  const_cast<uint8_t *>(data),
+                                  data,
                                   bnn::DataType::Float, false));
             } else if (shape.size() == 1) {
                 // bias or affine weight
-                auto buf = std::make_shared<std::vector<float>>(shape[0]);
-                memcpy(buf->data(), data, shape[0] * sizeof(float));
-                add_mat(name, std::make_shared<Mat>(shape[0], buf->data(),
+                // auto buf = std::make_shared<std::vector<float>>(shape[0]);
+                // memcpy(buf->data(), data, shape[0] * sizeof(float));
+                cudaMallocManaged((void **)&data, shape[0] * sizeof(float));
+                cudaMemcpy(data, tensor->float32_data()->Data(), shape[0] * sizeof(float), cudaMemcpyHostToDevice);
+                add_mat(name, std::make_shared<Mat>(shape[0], data,
                                                     DataType::Float));
-                float_bufs_.push_back(buf);
+                // float_bufs_.push_back(buf);
             }
         }
     }
@@ -296,7 +325,6 @@ void Net::add_mat(const std::string &name, std::shared_ptr<Mat> mat) {
 std::weak_ptr<Net> Net::get_weak() { return shared_from_this(); }
 
 std::shared_ptr<Net> Net::create() {
-    struct make_shared_enabler : public Net {};
     return std::make_shared<make_shared_enabler>();
 }
 
