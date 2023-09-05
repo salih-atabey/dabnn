@@ -147,16 +147,17 @@ struct binconv_functor
     const int kernel_h, kernel_w, pad_h, pad_w, stride_h, stride_w, dilation_h, dilation_w, output_channels;
     const int HWC;
     const int input_h, input_w, input_c;
+    const size_t input_hstep;
     const uint64_t* weight;
     const uint64_t* input;
 
     binconv_functor(const int kernel_h, const int kernel_w, const int pad_h, const int pad_w,
                     const int stride_h, const int stride_w, const int dilation_h, const int dilation_w,
-                    const int output_channels, const int HWC, const int input_h, const int input_w, const int input_c,
+                    const int output_channels, const int HWC, const int input_h, const int input_w, const int input_c, const size_t input_hstep,
                     uint64_t* weight, uint64_t* input)
         : kernel_h(kernel_h), kernel_w(kernel_w), pad_h(pad_h), pad_w(pad_w),
           stride_h(stride_h), stride_w(stride_w), dilation_h(dilation_h), dilation_w(dilation_w),
-          output_channels(output_channels), HWC(HWC), input_h(input_h), input_w(input_w), input_c(input_c),
+          output_channels(output_channels), HWC(HWC), input_h(input_h), input_w(input_w), input_c(input_c), input_hstep(input_hstep),
           weight(weight), input(input)
     {}
 
@@ -179,7 +180,7 @@ struct binconv_functor
                     int idx = tc * HWC + wh * kernel_w * input_c + ww * input_c + wc;
                     const auto w_value = weight[idx];
                     bool out = y < 0 || y >= input_h || x < 0 || x >= input_w;
-                    const auto bottom_value = out ? 0 : input[y * input_w * input_c + x * input_c + wc];
+                    const auto bottom_value = out ? 0 : input[y * input_hstep + x * input_c + wc];
                     uint8_t tmp = __popcll(w_value ^ bottom_value);
                     acc += tmp;
                 }
@@ -201,13 +202,14 @@ inline void binconv(const Mat& input, const Mat& weight,
     const int input_h = input.h;
     const int input_w = input.w;
     const int input_c = input.c;
+    const size_t input_hstep = input.hstep;
 
     thrust::counting_iterator<int> th_iter(0);
     thrust::counting_iterator<int> tw_iter(0);
     thrust::counting_iterator<int> tc_iter(0);
 
     binconv_functor func(kernel_h, kernel_w, pad_h, pad_w, stride_h, stride_w, dilation_h, dilation_w,
-                         output_channels, HWC, input_h, input_w, input_c,
+                         output_channels, HWC, input_h, input_w, input_c, input_hstep,
                          (uint64_t*)weight.data, (uint64_t*)input.data);
 
     thrust::transform(thrust::device,

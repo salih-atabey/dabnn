@@ -124,7 +124,7 @@ static void BM_bconv_float_1x1_128(benchmark::State &state) {
     uint64_t *a_data;                                                       \
     uint64_t *b_data;                                                       \
     cudaMallocManaged((void **)&a_data, ALEN * sizeof(uint64_t) / 64);      \
-    cudaMallocManaged((void **)&b_data, ALEN * sizeof(uint64_t) / 64);      \
+    cudaMallocManaged((void **)&b_data, BLEN * sizeof(uint64_t) / 64);      \
     FORZ(i, ALEN) { a_data[i] = 3 * i; }                                    \
     FORZ(i, BLEN) { b_data[i] = 2 * i; }                                    \
                                                                             \
@@ -143,7 +143,7 @@ static void BM_bnn_bconv_debug(benchmark::State &state) {
         a.display();
         std::cout << "Vector B:" << std::endl;
         b.display();
-        std::cout << "Adding vectors A and B..." << std::endl;
+        std::cout << "Conv vectors A and B..." << std::endl;
         bnn::baseline_bconv(a, b, BHEIGHT, BWIDTH, 0, 0, 1, 1, 1, 1, NUM_OUTPUT,
                             c);
         std::cout << "Vector C:" << std::endl;
